@@ -1,0 +1,72 @@
+# -----------------------------------------------------------
+# Flutter / Dart
+# -----------------------------------------------------------
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+pubspec.lock
+build/
+.dart_tool/
+
+# -----------------------------------------------------------
+# IDE / Editor
+# -----------------------------------------------------------
+.idea/
+.vscode/
+*.iml
+*.iws
+*.swp
+*.swo
+*~
+*.orig
+
+# -----------------------------------------------------------
+# Android (gradle)
+# -----------------------------------------------------------
+gradle-wrapper.jar
+/.gradle
+/captures/
+/gradlew
+/gradlew.bat
+/local.properties
+GeneratedPluginRegistrant.java
+.cxx/
+
+# -----------------------------------------------------------
+# iOS (macOS)
+# -----------------------------------------------------------
+*.xcworkspace
+*.xcuserstate
+*.xccheckout
+*.xcscheme
+*.xcuserdata
+Pods/
+Podfile.lock
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+*.hmap
+*.pch
+xcuserdata/
+DerivedData/
+.swiftpm/
+*.pbxuser
+!default.pbxuser
+*.perspectivev3
+!default.perspectivev3
+
+# -----------------------------------------------------------
+# Keystore & keys (ALWAYS keep outside repo)
+# -----------------------------------------------------------
+key.properties
+**/*.keystore
+**/*.jks
+
+# -----------------------------------------------------------
+# OS files
+# -----------------------------------------------------------
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
