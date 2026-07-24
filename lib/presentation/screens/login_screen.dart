@@ -32,12 +32,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     // Responsive sizing
     final screenWidth = MediaQuery.of(context).size.width;
-    final screenHeight = MediaQuery.of(context).size.height;
     final isVerySmall = screenWidth < 360;
 
     // Dynamic sizes
-    final double logoSize = isVerySmall ? 40 : 50;
-    final double titleFontSize = Responsive.getResponsiveFontSize(context, baseSize: 28);
+    final double logoSize = isVerySmall ? 32 : 50;
+    final double titleFontSize = Responsive.getResponsiveFontSize(context, baseSize: 24);
     final double fieldFontSize = Responsive.getResponsiveFontSize(context, baseSize: 14);
     final double buttonFontSize = Responsive.getResponsiveFontSize(context, baseSize: 16);
     final double cardPadding = Responsive.getResponsivePadding(context, basePadding: 24);
@@ -70,9 +69,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          // Logo + App Name (responsive)
+                          // Logo + App Name (responsive, wraps to two lines)
                           Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
                               Image.asset(
                                 'assets/images/hortihub_logo_1.jpg',
@@ -85,17 +84,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 ),
                               ),
                               const SizedBox(width: 12),
-                              Text(
-                                'MEG Horticulture Hub',
-                                style: TextStyle(
-                                  fontSize: titleFontSize,
-                                  fontWeight: FontWeight.bold,
-                                  color: const Color(0xFF026D2A),
+                              Expanded(
+                                child: Text(
+                                  'MEG Horticulture Hub',
+                                  style: TextStyle(
+                                    fontSize: titleFontSize,
+                                    fontWeight: FontWeight.bold,
+                                    color: const Color(0xFF026D2A),
+                                  ),
+                                  softWrap: true,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                             ],
                           ),
-                          SizedBox(height: isVerySmall ? 20 : 30),
+                          SizedBox(height: isVerySmall ? 16 : 30),
 
                           // Username
                           TextFormField(
@@ -116,7 +120,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           ),
                           SizedBox(height: isVerySmall ? 10 : 16),
 
-                          // Password with eye button
+                          // Password
                           TextFormField(
                             controller: _passwordController,
                             style: TextStyle(fontSize: fieldFontSize),
@@ -149,7 +153,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           ),
                           SizedBox(height: isVerySmall ? 16 : 24),
 
-                          // Error message (if any)
                           if (authState.hasError)
                             Padding(
                               padding: const EdgeInsets.only(bottom: 12),

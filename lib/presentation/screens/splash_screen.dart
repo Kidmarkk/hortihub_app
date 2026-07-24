@@ -5,6 +5,11 @@ class SplashScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isVerySmall = screenWidth < 360;
+    final double logoSize = isVerySmall ? 120 : 150;
+    final double fontSize = isVerySmall ? 24 : 32;
+
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
@@ -23,30 +28,32 @@ class SplashScreen extends StatelessWidget {
           children: [
             Image.asset(
               'assets/images/hortihub_logo_1.jpg',
-              width: 150,
-              height: 150,
-              errorBuilder: (_, __, ___) => const Icon(
+              width: logoSize,
+              height: logoSize,
+              errorBuilder: (_, __, ___) => Icon(
                 Icons.image_not_supported,
                 color: Colors.white70,
-                size: 150,
+                size: logoSize,
               ),
             ),
             const SizedBox(height: 24),
-            // App name – explicitly no underline
             Text(
               'MEG Horticulture Hub',
-              style: const TextStyle(
-                fontSize: 32,
+              style: TextStyle(
+                fontSize: fontSize,
                 fontWeight: FontWeight.bold,
                 color: Colors.white,
-                decoration: TextDecoration.none, // <-- removes the yellow line
+                decoration: TextDecoration.none,
               ),
+              textAlign: TextAlign.center,
+              softWrap: true,
+              maxLines: 2,
             ),
             const SizedBox(height: 40),
-            const SizedBox(
+            SizedBox(
               width: 40,
               height: 40,
-              child: CircularProgressIndicator(
+              child: const CircularProgressIndicator(
                 color: Colors.white,
                 strokeWidth: 3,
               ),
