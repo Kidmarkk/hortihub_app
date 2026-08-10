@@ -61,7 +61,7 @@ class _AddEditRateScreenState extends ConsumerState<AddEditRateScreen> {
     final isEditing = widget.rate != null;
     final hubCode = int.tryParse(widget.hubCode) ?? 0;
 
-    final masterDataAsync = ref.watch(masterDataProvider);
+    final masterDataAsync = ref.watch(masterDataProvider(widget.hubCode));
 
     final isVerySmall = Responsive.isVerySmallScreen(context);
     final padding = Responsive.getResponsivePadding(context);
@@ -97,7 +97,7 @@ class _AddEditRateScreenState extends ConsumerState<AddEditRateScreen> {
                   IgnorePointer(
                     ignoring: isEditing,
                     child: DropdownButtonFormField<String>(
-                      value: _selectedCropCategoryCode,
+                      initialValue: _selectedCropCategoryCode,
                       hint: const Text('Select Crop Category'),
                       items: masterData.cropCategories.map((c) {
                         return DropdownMenuItem(
@@ -132,7 +132,7 @@ class _AddEditRateScreenState extends ConsumerState<AddEditRateScreen> {
                         IgnorePointer(
                           ignoring: isEditing,
                           child: DropdownButtonFormField<String>(
-                            value: _selectedCropCode,
+                            initialValue: _selectedCropCode,
                             hint: const Text('Select Crop'),
                             items: filteredCrops.map((c) {
                               return DropdownMenuItem(
@@ -165,7 +165,7 @@ class _AddEditRateScreenState extends ConsumerState<AddEditRateScreen> {
                   IgnorePointer(
                     ignoring: isEditing,
                     child: DropdownButtonFormField<String>(
-                      value: _selectedPackagingTypeCode,
+                      initialValue: _selectedPackagingTypeCode,
                       hint: const Text('Select Packaging Type'),
                       items: masterData.packagingTypes.map((p) {
                         return DropdownMenuItem(
@@ -210,7 +210,7 @@ class _AddEditRateScreenState extends ConsumerState<AddEditRateScreen> {
 
                   // Unit dropdown (always editable)
                   DropdownButtonFormField<String>(
-                    value: _selectedUnitCode,
+                    initialValue: _selectedUnitCode,
                     hint: const Text('Select Unit'),
                     items: masterData.units.map((u) {
                       return DropdownMenuItem(
@@ -302,7 +302,7 @@ class _AddEditRateScreenState extends ConsumerState<AddEditRateScreen> {
                         await notifier.addRate(payload);
                       }
 
-                      ref.refresh(masterDataProvider);
+                      ref.refresh(masterDataProvider(widget.hubCode));
                       ref.refresh(ratesListProvider(widget.hubCode));
 
                       if (mounted) {

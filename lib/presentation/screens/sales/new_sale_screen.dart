@@ -23,10 +23,13 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
   List<SalesOrderItem> items = [];
 
   void _addItem() {
+    ref.refresh(masterDataProvider(widget.hubCode));
+    ref.refresh(stockForSaleProvider(widget.hubCode));
     showDialog(
       context: context,
       builder: (ctx) => AddItemDialog(
         hubCode: widget.hubCode,
+        cartItems: items,
         onAdd: (item) {
           setState(() => items.add(item));
         },
@@ -95,6 +98,7 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
         child: ListView(
           padding: EdgeInsets.all(padding),
           children: [
+            // ... buyer details fields (unchanged)
             Text(
               'Buyer Details',
               style: TextStyle(
@@ -214,7 +218,14 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
 class AddItemDialog extends ConsumerStatefulWidget {
   final String hubCode;
   final Function(SalesOrderItem) onAdd;
-  const AddItemDialog({super.key, required this.hubCode, required this.onAdd});
+  final List<SalesOrderItem> cartItems; // ✅ added
+
+  const AddItemDialog({
+    super.key,
+    required this.hubCode,
+    required this.onAdd,
+    required this.cartItems,
+  });
 
   @override
   ConsumerState<AddItemDialog> createState() => _AddItemDialogState();
@@ -236,7 +247,7 @@ class _AddItemDialogState extends ConsumerState<AddItemDialog> {
   @override
   Widget build(BuildContext context) {
     final stockAsync = ref.watch(stockForSaleProvider(widget.hubCode));
-    final masterDataAsync = ref.watch(masterDataProvider);
+    final masterDataAsync = ref.watch(masterDataProvider(widget.hubCode));
     final isVerySmall = Responsive.isVerySmallScreen(context);
     final fontSize = Responsive.getResponsiveFontSize(context, baseSize: 13);
 
@@ -246,11 +257,6 @@ class _AddItemDialogState extends ConsumerState<AddItemDialog> {
         loading: () => const SizedBox(height: 200, child: Center(child: CircularProgressIndicator())),
         error: (err, _) => Text('Error loading master data: $err', style: TextStyle(fontSize: fontSize)),
         data: (masterData) {
-          final cropCategories = masterData.cropCategories;
-          final filteredCrops = masterData.crops
-              .where((c) => c.categoryCode == _selectedCropCategoryCode)
-              .toList();
-
           return stockAsync.when(
             loading: () => const SizedBox(height: 200, child: Center(child: CircularProgressIndicator())),
             error: (err, _) => Text('Error loading stock: $err', style: TextStyle(fontSize: fontSize)),
@@ -278,6 +284,21 @@ class _AddItemDialogState extends ConsumerState<AddItemDialog> {
                 );
               }
 
+              //Filter crop categories to only those that have at least one crop with stock
+              final validCropCategories = masterData.cropCategories.where((cat) {
+                return masterData.crops.any((c) =>
+                    c.categoryCode == cat.code &&
+                    stockItems.any((stock) => stock.cropCode.toString() == c.code));
+              }).toList();
+
+              // Filter crops based on selected category AND stock availability
+              final filteredCrops = masterData.crops
+                  .where((c) =>
+                      c.categoryCode == _selectedCropCategoryCode &&
+                      stockItems.any((stock) => stock.cropCode.toString() == c.code))
+                  .toList();
+
+              // Filter packaging options based on selected crop and stock
               final packagingOptions = stockItems
                   .where((e) => _selectedCropCode == null || e.cropCode.toString() == _selectedCropCode)
                   .toList();
@@ -328,7 +349,15 @@ class _AddItemDialogState extends ConsumerState<AddItemDialog> {
                     amount: 0,
                   ),
                 );
-                maxQty = stockItem.quantityAvailable;
+
+                final usedQty = widget.cartItems
+                    .where((item) =>
+                        item.cropCode == int.tryParse(_selectedCropCode!) &&
+                        item.packagingTypeCode == int.tryParse(_selectedPackagingCode!))
+                    .fold(0, (sum, item) => sum + item.quantity);
+
+                maxQty = stockItem.quantityAvailable - usedQty;
+                if (maxQty < 0) maxQty = 0;
               }
 
               final quantityOptions = List<int>.generate(maxQty, (i) => i + 1).toList();
@@ -344,11 +373,11 @@ class _AddItemDialogState extends ConsumerState<AddItemDialog> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Crop Category dropdown
+                    // Crop Category dropdown (filtered)
                     DropdownButtonFormField<String>(
                       value: _selectedCropCategoryCode,
                       hint: Text('Select Crop Category', style: TextStyle(fontSize: fontSize)),
-                      items: cropCategories
+                      items: validCropCategories
                           .where((c) => c.code.isNotEmpty)
                           .map((c) => DropdownMenuItem(
                             value: c.code,
@@ -358,7 +387,7 @@ class _AddItemDialogState extends ConsumerState<AddItemDialog> {
                       onChanged: (code) {
                         setState(() {
                           _selectedCropCategoryCode = code;
-                          _selectedCropCategoryName = cropCategories.firstWhere((c) => c.code == code).name;
+                          _selectedCropCategoryName = validCropCategories.firstWhere((c) => c.code == code).name;
                           _selectedCropCode = null;
                           _selectedCropName = null;
                           _selectedPackagingCode = null;
@@ -375,7 +404,7 @@ class _AddItemDialogState extends ConsumerState<AddItemDialog> {
                     ),
                     const SizedBox(height: 8),
 
-                    // Crop dropdown (only if category selected)
+                    // Crop dropdown (only if category selected, filtered by stock)
                     if (_selectedCropCategoryCode != null)
                       Column(
                         children: [
@@ -442,7 +471,7 @@ class _AddItemDialogState extends ConsumerState<AddItemDialog> {
                         ],
                       ),
 
-                    // Quantity and Price (only if packaging selected and stock available)
+                    // Quantity and Price (only if packaging selected and maxQty > 0)
                     if (_selectedPackagingCode != null && maxQty > 0) ...[
                       DropdownButtonFormField<int>(
                         value: _selectedQuantity,

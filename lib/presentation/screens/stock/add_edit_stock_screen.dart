@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hortihub_new_app/core/utils/responsive.dart';
 import '../../../data/models/stock_models.dart';
@@ -31,11 +32,12 @@ class _AddEditStockScreenState extends ConsumerState<AddEditStockScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.refresh(masterDataProvider);
+      ref.refresh(masterDataProvider(widget.hubCode));
     });
     if (widget.stockItem != null) {
       _selectedCropCode = widget.stockItem!.cropCode?.toString();
-      _selectedPackagingTypeCode = widget.stockItem!.packagingTypeCode?.toString();
+      _selectedPackagingTypeCode = widget.stockItem!.packagingTypeCode
+          ?.toString();
       _selectedUnitCode = widget.stockItem!.unitCode?.toString();
       _quantityAvailable = widget.stockItem!.quantityAvailable ?? 0;
       _isAvailable = widget.stockItem!.isAvailable == 'Yes' ? 'Y' : 'N';
@@ -48,9 +50,20 @@ class _AddEditStockScreenState extends ConsumerState<AddEditStockScreen> {
   List<DropdownMenuItem<String>> _getPackagingItems(MasterData masterData) {
     final filtered = masterData.packagingTypes
         .where(
-          (p) => masterData.cropPackagingMap[_selectedCropCode]?.contains(p.code) ?? false,
+          (p) =>
+              masterData.cropPackagingMap[_selectedCropCode]?.contains(
+                p.code,
+              ) ??
+              false,
         )
         .toList();
+
+    print(
+      '🔍 Filtered packaging types for crop $_selectedCropCode: ${filtered.map((p) => '${p.code}:${p.name}').toList()}',
+    );
+    print(
+      '🔍 cropPackagingMap for $_selectedCropCode: ${masterData.cropPackagingMap[_selectedCropCode]}',
+    );
 
     // If editing and current value is not in filtered list, add it
     final isEditing = widget.stockItem != null;
@@ -59,7 +72,8 @@ class _AddEditStockScreenState extends ConsumerState<AddEditStockScreen> {
       if (!exists) {
         final current = masterData.packagingTypes.firstWhere(
           (p) => p.code == _selectedPackagingTypeCode,
-          orElse: () => PackagingType(code: _selectedPackagingTypeCode!, name: 'Unknown'),
+          orElse: () =>
+              PackagingType(code: _selectedPackagingTypeCode!, name: 'Unknown'),
         );
         filtered.add(current);
       }
@@ -68,7 +82,12 @@ class _AddEditStockScreenState extends ConsumerState<AddEditStockScreen> {
     return filtered.map((p) {
       return DropdownMenuItem(
         value: p.code,
-        child: Text(p.name, style: TextStyle(fontSize: Responsive.getResponsiveFontSize(context, baseSize: 14))),
+        child: Text(
+          p.name,
+          style: TextStyle(
+            fontSize: Responsive.getResponsiveFontSize(context, baseSize: 14),
+          ),
+        ),
       );
     }).toList();
   }
@@ -77,7 +96,9 @@ class _AddEditStockScreenState extends ConsumerState<AddEditStockScreen> {
   List<DropdownMenuItem<String>> _getUnitItems(MasterData masterData) {
     final filtered = masterData.units
         .where(
-          (u) => masterData.cropUnitMap[_selectedCropCode]?.contains(u.code) ?? false,
+          (u) =>
+              masterData.cropUnitMap[_selectedCropCode]?.contains(u.code) ??
+              false,
         )
         .toList();
 
@@ -97,7 +118,12 @@ class _AddEditStockScreenState extends ConsumerState<AddEditStockScreen> {
     return filtered.map((u) {
       return DropdownMenuItem(
         value: u.code,
-        child: Text(u.name, style: TextStyle(fontSize: Responsive.getResponsiveFontSize(context, baseSize: 14))),
+        child: Text(
+          u.name,
+          style: TextStyle(
+            fontSize: Responsive.getResponsiveFontSize(context, baseSize: 14),
+          ),
+        ),
       );
     }).toList();
   }
@@ -111,13 +137,15 @@ class _AddEditStockScreenState extends ConsumerState<AddEditStockScreen> {
     final spacing = isVerySmall ? 6.0 : 12.0;
     final padding = Responsive.getResponsivePadding(context);
 
-    final masterDataAsync = ref.watch(masterDataProvider);
+    final masterDataAsync = ref.watch(masterDataProvider(widget.hubCode));
 
     return Scaffold(
       appBar: AppBar(
         title: Text(
           isEditing ? 'Edit Stock' : 'Add Stock',
-          style: TextStyle(fontSize: Responsive.getResponsiveFontSize(context, baseSize: 18)),
+          style: TextStyle(
+            fontSize: Responsive.getResponsiveFontSize(context, baseSize: 18),
+          ),
         ),
       ),
       body: Form(
@@ -137,16 +165,34 @@ class _AddEditStockScreenState extends ConsumerState<AddEditStockScreen> {
               child: Text(
                 'ℹ️ Stock will appear in the list only after a rate is initialized for this crop and packaging type.\n'
                 'If you don’t see the stock after adding, please go to Initialization > Rates and add a rate first.',
-                style: TextStyle(fontSize: fontSize * 0.9, color: Colors.blue.shade800),
+                style: TextStyle(
+                  fontSize: fontSize * 0.9,
+                  color: Colors.blue.shade800,
+                ),
               ),
             ),
             masterDataAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (err, _) => Center(child: Text('Error: $err', style: TextStyle(fontSize: fontSize))),
+              error: (err, _) => Center(
+                child: Text(
+                  'Error: $err',
+                  style: TextStyle(fontSize: fontSize),
+                ),
+              ),
               data: (masterData) {
-                final validCropCategories = masterData.cropCategories.where((cat) {
+                print(
+                  '🔍 All rates: ${masterData.rates.map((r) => 'crop=${r.cropCode}, pkg=${r.packagingTypeCode}')}',
+                );
+                print(
+                  '🔍 cropPackagingMap for crop $_selectedCropCode: ${masterData.cropPackagingMap[_selectedCropCode]}',
+                );
+                final validCropCategories = masterData.cropCategories.where((
+                  cat,
+                ) {
                   return masterData.crops.any(
-                    (c) => c.categoryCode == cat.code && masterData.validCropCodes.contains(c.code),
+                    (c) =>
+                        c.categoryCode == cat.code &&
+                        masterData.validCropCodes.contains(c.code),
                   );
                 }).toList();
 
@@ -154,12 +200,18 @@ class _AddEditStockScreenState extends ConsumerState<AddEditStockScreen> {
                   children: [
                     // Crop Category dropdown
                     DropdownButtonFormField<String>(
-                      value: _selectedCropCategoryCode,
-                      hint: Text('Select Crop Category', style: TextStyle(fontSize: fontSize)),
+                      initialValue: _selectedCropCategoryCode,
+                      hint: Text(
+                        'Select Crop Category',
+                        style: TextStyle(fontSize: fontSize),
+                      ),
                       items: validCropCategories.map((c) {
                         return DropdownMenuItem(
                           value: c.code,
-                          child: Text(c.name, style: TextStyle(fontSize: fontSize)),
+                          child: Text(
+                            c.name,
+                            style: TextStyle(fontSize: fontSize),
+                          ),
                         );
                       }).toList(),
                       onChanged: (val) {
@@ -187,17 +239,27 @@ class _AddEditStockScreenState extends ConsumerState<AddEditStockScreen> {
                       Column(
                         children: [
                           DropdownButtonFormField<String>(
-                            value: _selectedCropCode,
-                            hint: Text('Select Crop', style: TextStyle(fontSize: fontSize)),
+                            initialValue: _selectedCropCode,
+                            hint: Text(
+                              'Select Crop',
+                              style: TextStyle(fontSize: fontSize),
+                            ),
                             items: masterData.crops
                                 .where(
-                                  (c) => c.categoryCode == _selectedCropCategoryCode &&
-                                      masterData.validCropCodes.contains(c.code),
+                                  (c) =>
+                                      c.categoryCode ==
+                                          _selectedCropCategoryCode &&
+                                      masterData.validCropCodes.contains(
+                                        c.code,
+                                      ),
                                 )
                                 .map((c) {
                                   return DropdownMenuItem(
                                     value: c.code,
-                                    child: Text(c.name, style: TextStyle(fontSize: fontSize)),
+                                    child: Text(
+                                      c.name,
+                                      style: TextStyle(fontSize: fontSize),
+                                    ),
                                   );
                                 })
                                 .toList(),
@@ -227,8 +289,11 @@ class _AddEditStockScreenState extends ConsumerState<AddEditStockScreen> {
                       Column(
                         children: [
                           DropdownButtonFormField<String>(
-                            value: _selectedPackagingTypeCode,
-                            hint: Text('Select Packaging Type', style: TextStyle(fontSize: fontSize)),
+                            initialValue: _selectedPackagingTypeCode,
+                            hint: Text(
+                              'Select Packaging Type',
+                              style: TextStyle(fontSize: fontSize),
+                            ),
                             items: _getPackagingItems(masterData),
                             onChanged: (val) {
                               setState(() {
@@ -251,8 +316,11 @@ class _AddEditStockScreenState extends ConsumerState<AddEditStockScreen> {
 
                     // Is Available
                     DropdownButtonFormField<String>(
-                      value: _isAvailable,
-                      hint: Text('Is in Stock?', style: TextStyle(fontSize: fontSize)),
+                      initialValue: _isAvailable,
+                      hint: Text(
+                        'Is in Stock?',
+                        style: TextStyle(fontSize: fontSize),
+                      ),
                       items: const [
                         DropdownMenuItem(value: 'Y', child: Text('Yes')),
                         DropdownMenuItem(value: 'N', child: Text('No')),
@@ -280,37 +348,58 @@ class _AddEditStockScreenState extends ConsumerState<AddEditStockScreen> {
 
                     // Quantity (only if Yes)
                     if (_isAvailable == 'Y')
-                      Column(
-                        children: [
-                          TextFormField(
-                            initialValue: _quantityAvailable?.toString() ?? '',
-                            style: TextStyle(fontSize: fontSize),
-                            decoration: InputDecoration(
-                              labelText: 'Quantity Available',
-                              labelStyle: TextStyle(fontSize: fontSize),
-                              border: const OutlineInputBorder(),
-                              contentPadding: EdgeInsets.symmetric(
-                                vertical: isVerySmall ? 8 : 14,
-                                horizontal: 12,
+                      // Quantity (only if Yes)
+                      if (_isAvailable == 'Y')
+                        Column(
+                          children: [
+                            TextFormField(
+                              initialValue:
+                                  _quantityAvailable?.toString() ?? '',
+                              style: TextStyle(fontSize: fontSize),
+                              decoration: InputDecoration(
+                                labelText: 'Quantity Available',
+                                labelStyle: TextStyle(fontSize: fontSize),
+                                border: const OutlineInputBorder(),
+                                contentPadding: EdgeInsets.symmetric(
+                                  vertical: isVerySmall ? 8 : 14,
+                                  horizontal: 12,
+                                ),
                               ),
+                              keyboardType: TextInputType.number,
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly,
+                              ], // only allow digits
+                              onChanged: (val) {
+                                // Only update if it's a valid integer
+                                final parsed = int.tryParse(val);
+                                if (parsed != null) {
+                                  _quantityAvailable = parsed;
+                                } else {
+                                  // If invalid, keep previous value (or set to null)
+                                  // We'll rely on the validator to prevent submission.
+                                }
+                              },
+                              validator: (v) {
+                                if (v == null || v.isEmpty) return 'Required';
+                                if (int.tryParse(v) == null)
+                                  return 'Enter a whole number (e.g., 5)';
+                                return null;
+                              },
                             ),
-                            keyboardType: TextInputType.number,
-                            onChanged: (val) {
-                              _quantityAvailable = int.tryParse(val);
-                            },
-                            validator: (v) => v!.isEmpty ? 'Required' : null,
-                          ),
-                          SizedBox(height: spacing),
-                        ],
-                      ),
+                            SizedBox(height: spacing),
+                          ],
+                        ),
 
                     // Unit (only if crop selected and available Yes)
                     if (_selectedCropCode != null && _isAvailable == 'Y')
                       Column(
                         children: [
                           DropdownButtonFormField<String>(
-                            value: _selectedUnitCode,
-                            hint: Text('Select Unit', style: TextStyle(fontSize: fontSize)),
+                            initialValue: _selectedUnitCode,
+                            hint: Text(
+                              'Select Unit',
+                              style: TextStyle(fontSize: fontSize),
+                            ),
                             items: _getUnitItems(masterData),
                             onChanged: (val) {
                               setState(() {
@@ -348,7 +437,8 @@ class _AddEditStockScreenState extends ConsumerState<AddEditStockScreen> {
 
                 final hubCode = int.tryParse(widget.hubCode) ?? 0;
                 final cropCode = int.tryParse(_selectedCropCode!) ?? 0;
-                final packagingTypeCode = int.tryParse(_selectedPackagingTypeCode!) ?? 0;
+                final packagingTypeCode =
+                    int.tryParse(_selectedPackagingTypeCode!) ?? 0;
                 final quantityAvailable = _quantityAvailable ?? 0;
                 final isAvailable = _isAvailable == 'Y' ? 'Yes' : 'No';
 
@@ -377,7 +467,9 @@ class _AddEditStockScreenState extends ConsumerState<AddEditStockScreen> {
                   ref.refresh(stockListProvider(widget.hubCode));
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Stock updated successfully')),
+                      const SnackBar(
+                        content: Text('Stock updated successfully'),
+                      ),
                     );
                     Navigator.pop(context);
                   }
@@ -397,28 +489,51 @@ class _AddEditStockScreenState extends ConsumerState<AddEditStockScreen> {
 
                   // Get the response message
                   final message = await notifier.addStock(payload, user.token);
-                  final isDuplicate = message.toLowerCase().contains('already exists');
+                  final isDuplicate = message.toLowerCase().contains(
+                    'already exists',
+                  );
 
                   // Check if stock appears in the list (rate exists)
                   ref.refresh(stockListProvider(widget.hubCode));
-                  final freshList = await ref.read(stockListProvider(widget.hubCode).future);
-                  final exists = freshList.any((item) =>
-                      item.cropCode == cropCode.toString() &&
-                      item.packagingTypeCode == packagingTypeCode.toString());
+                  final freshList = await ref.read(
+                    stockListProvider(widget.hubCode).future,
+                  );
+
+                  // 🔍 Debug prints – remove later
+                  print('🟢 Fresh list after adding stock:');
+                  for (var item in freshList) {
+                    print(
+                      '   cropCode: ${item.cropCode}, packagingTypeCode: ${item.packagingTypeCode}',
+                    );
+                  }
+                  print(
+                    '🔍 Looking for cropCode: $cropCode, packagingTypeCode: $packagingTypeCode',
+                  );
+
+                  // ✅ Correct comparison using int values
+                  final exists = freshList.any(
+                    (item) =>
+                        item.cropCode == cropCode &&
+                        item.packagingTypeCode == packagingTypeCode,
+                  );
+
+                  print('🔍 exists: $exists');
 
                   if (!exists) {
                     // Rate missing – show dialog with dynamic message
                     final dialogMessage = isDuplicate
                         ? 'Stock already exists, but it will not appear in the list because a rate has not been initialized for this crop and packaging type.\n\n'
-                          'Would you like to add a rate now?'
+                              'Would you like to add a rate now?'
                         : 'Stock was added successfully, but it will not appear in the list because a rate has not been initialized for this crop and packaging type.\n\n'
-                          'Would you like to add a rate now?';
+                              'Would you like to add a rate now?';
 
                     final shouldGoToRates = await showDialog<bool>(
                       context: context,
                       barrierDismissible: false,
                       builder: (ctx) => AlertDialog(
-                        title: Text(isDuplicate ? 'Stock Already Exists' : 'Stock Added'),
+                        title: Text(
+                          isDuplicate ? 'Stock Already Exists' : 'Stock Added',
+                        ),
                         content: Text(dialogMessage),
                         actions: [
                           TextButton(
@@ -453,7 +568,13 @@ class _AddEditStockScreenState extends ConsumerState<AddEditStockScreen> {
                     } else {
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(isDuplicate ? 'Stock already exists. Please initialize rate later.' : 'Stock added. Please initialize rate later.')),
+                          SnackBar(
+                            content: Text(
+                              isDuplicate
+                                  ? 'Stock already exists. Please initialize rate later.'
+                                  : 'Stock added. Please initialize rate later.',
+                            ),
+                          ),
                         );
                         Navigator.pop(context);
                       }
@@ -461,10 +582,12 @@ class _AddEditStockScreenState extends ConsumerState<AddEditStockScreen> {
                   } else {
                     // Rate exists – show appropriate message
                     if (mounted) {
-                      final snackMsg = isDuplicate ? 'Stock already exists' : 'Stock saved successfully';
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(snackMsg)),
-                      );
+                      final snackMsg = isDuplicate
+                          ? 'Stock already exists'
+                          : 'Stock saved successfully';
+                      ScaffoldMessenger.of(
+                        context,
+                      ).showSnackBar(SnackBar(content: Text(snackMsg)));
                       Navigator.pop(context);
                     }
                   }
@@ -473,13 +596,16 @@ class _AddEditStockScreenState extends ConsumerState<AddEditStockScreen> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.green[700],
                 foregroundColor: Colors.white,
-                padding: EdgeInsets.symmetric(
-                  vertical: isVerySmall ? 10 : 14,
-                ),
+                padding: EdgeInsets.symmetric(vertical: isVerySmall ? 10 : 14),
               ),
               child: Text(
                 isEditing ? 'Update' : 'Add',
-                style: TextStyle(fontSize: Responsive.getResponsiveFontSize(context, baseSize: 16)),
+                style: TextStyle(
+                  fontSize: Responsive.getResponsiveFontSize(
+                    context,
+                    baseSize: 16,
+                  ),
+                ),
               ),
             ),
           ],

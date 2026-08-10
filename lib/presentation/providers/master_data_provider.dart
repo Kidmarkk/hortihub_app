@@ -5,31 +5,27 @@ import 'auth_provider.dart';
 
 final masterDataRepositoryProvider = Provider((ref) => MasterDataRepository());
 
-// Provider that fetches master data using the current user's hubCode
-final masterDataProvider = FutureProvider<MasterData>((ref) async {
-  final user = ref.watch(authStateProvider).value;
-  final hubCode = user?.hubCode ?? '1'; // fallback hubCode
+final masterDataProvider = FutureProvider.family<MasterData, String>((ref, hubCode) async {
   final repo = ref.read(masterDataRepositoryProvider);
   return await repo.getMasterData(hubCode);
 });
 
-// Individual providers for each list
-final cropCategoriesProvider = FutureProvider<List<CropCategory>>((ref) async {
-  final data = await ref.watch(masterDataProvider.future);
+final cropCategoriesProvider = FutureProvider.family<List<CropCategory>, String>((ref, hubCode) async {
+  final data = await ref.watch(masterDataProvider(hubCode).future);
   return data.cropCategories;
 });
 
-final cropsProvider = FutureProvider<List<Crop>>((ref) async {
-  final data = await ref.watch(masterDataProvider.future);
+final cropsProvider = FutureProvider.family<List<Crop>, String>((ref, hubCode) async {
+  final data = await ref.watch(masterDataProvider(hubCode).future);
   return data.crops;
 });
 
-final packagingTypesProvider = FutureProvider<List<PackagingType>>((ref) async {
-  final data = await ref.watch(masterDataProvider.future);
+final packagingTypesProvider = FutureProvider.family<List<PackagingType>, String>((ref, hubCode) async {
+  final data = await ref.watch(masterDataProvider(hubCode).future);
   return data.packagingTypes;
 });
 
-final unitsProvider = FutureProvider<List<Unit>>((ref) async {
-  final data = await ref.watch(masterDataProvider.future);
+final unitsProvider = FutureProvider.family<List<Unit>, String>((ref, hubCode) async {
+  final data = await ref.watch(masterDataProvider(hubCode).future);
   return data.units;
 });

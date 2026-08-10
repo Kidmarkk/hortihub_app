@@ -93,7 +93,7 @@ class _AddEditProductionScreenState
                   children: [
                     // Financial Year dropdown
                     DropdownButtonFormField<String>(
-                      value: _selectedFinancialYearCode,
+                      initialValue: _selectedFinancialYearCode,
                       hint: Text('Select Financial Year', style: TextStyle(fontSize: fontSize)),
                       items: masterData.financialYears.map((fy) {
                         return DropdownMenuItem(
@@ -134,7 +134,7 @@ class _AddEditProductionScreenState
 
                     // Crop Category dropdown
                     DropdownButtonFormField<String>(
-                      value: _selectedCropCategoryCode,
+                      initialValue: _selectedCropCategoryCode,
                       hint: Text('Select Crop Category', style: TextStyle(fontSize: fontSize)),
                       items: masterData.cropCategories.map((cat) {
                         return DropdownMenuItem(
@@ -165,7 +165,7 @@ class _AddEditProductionScreenState
                       Column(
                         children: [
                           DropdownButtonFormField<String>(
-                            value: _selectedCropCode,
+                            initialValue: _selectedCropCode,
                             hint: Text('Select Crop', style: TextStyle(fontSize: fontSize)),
                             items: filteredCrops.map((c) {
                               return DropdownMenuItem(
@@ -247,7 +247,7 @@ class _AddEditProductionScreenState
 
                     // Unit dropdown
                     DropdownButtonFormField<String>(
-                      value: _selectedUnitCode,
+                      initialValue: _selectedUnitCode,
                       hint: Text('Select Unit', style: TextStyle(fontSize: fontSize)),
                       items: masterData.units.map((u) {
                         return DropdownMenuItem(
