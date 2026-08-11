@@ -218,7 +218,7 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
 class AddItemDialog extends ConsumerStatefulWidget {
   final String hubCode;
   final Function(SalesOrderItem) onAdd;
-  final List<SalesOrderItem> cartItems; // ✅ added
+  final List<SalesOrderItem> cartItems;
 
   const AddItemDialog({
     super.key,

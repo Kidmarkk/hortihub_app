@@ -48,7 +48,7 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
   String? _validateConfirmPassword(String? value) {
     if (value == null || value.isEmpty) return 'Please confirm your new password';
     if (value != _newPasswordCtrl.text) {
-      return 'Confirm New Password does not match New Password';
+      return 'Does not match New Password';
     }
     return null;
   }
