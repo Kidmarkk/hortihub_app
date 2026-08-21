@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hortihub_new_app/core/utils/responsive.dart';
 import 'package:hortihub_new_app/presentation/providers/master_data_provider.dart';
+import 'package:hortihub_new_app/services/print_service.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/sales_provider.dart';
 import '../../../data/models/sales_models.dart';
@@ -44,7 +45,9 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     if (items.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Add at least one item')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Add at least one item')));
       return;
     }
 
@@ -76,6 +79,76 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Sale created. Preparing receipt...')),
+      );
+    }
+
+    // Give the provider a moment to refresh and then fetch the updated list
+    await Future.delayed(const Duration(milliseconds: 800));
+    final salesList = await ref.read(salesListProvider(widget.hubCode).future);
+
+    // Find the newly created sale – we assume it’s the first one (most recent) and matches the buyer name
+    final newSale = salesList.isNotEmpty
+        ? salesList.firstWhere(
+            (s) => s.buyerName == order.buyerName,
+            orElse: () => salesList.first,
+          )
+        : null;
+
+    if (mounted) {
+      // Ask if user wants to print the receipt
+      final shouldPrint = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Print Receipt'),
+          content: const Text('Do you want to print this receipt?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('No'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Yes'),
+            ),
+          ],
+        ),
+      );
+
+      if (shouldPrint == true) {
+        if (newSale != null && newSale.salesOrderCode != null) {
+          try {
+            // Generate the invoice using the fetched salesOrderCode
+            final repo = ref.read(salesRepositoryProvider);
+            final base64 = await repo.generateInvoice(
+              newSale.salesOrderCode!.toString(),
+              user!.token,
+            );
+            // Send to system print dialog
+            await PrintService.printReceipt(base64);
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Receipt sent to printer')),
+            );
+          } catch (e) {
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text('Print failed: $e')));
+          }
+        } else {
+          // If we couldn't get the order code, inform the user
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Sale created, but the receipt could not be generated. You can print it from the sales list.',
+              ),
+              duration: Duration(seconds: 4),
+            ),
+          );
+        }
+      }
+
+      // Finally, show success and pop
+      ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Sale created successfully')),
       );
       Navigator.pop(context);
@@ -91,7 +164,12 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('New Sale', style: TextStyle(fontSize: Responsive.getResponsiveFontSize(context, baseSize: 18))),
+        title: Text(
+          'New Sale',
+          style: TextStyle(
+            fontSize: Responsive.getResponsiveFontSize(context, baseSize: 18),
+          ),
+        ),
       ),
       body: Form(
         key: _formKey,
@@ -102,7 +180,10 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
             Text(
               'Buyer Details',
               style: TextStyle(
-                fontSize: Responsive.getResponsiveFontSize(context, baseSize: 18),
+                fontSize: Responsive.getResponsiveFontSize(
+                  context,
+                  baseSize: 18,
+                ),
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -158,15 +239,24 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
                 Text(
                   'Items',
                   style: TextStyle(
-                    fontSize: Responsive.getResponsiveFontSize(context, baseSize: 18),
+                    fontSize: Responsive.getResponsiveFontSize(
+                      context,
+                      baseSize: 18,
+                    ),
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                IconButton(onPressed: _addItem, icon: Icon(Icons.add, size: isVerySmall ? 20 : 24)),
+                IconButton(
+                  onPressed: _addItem,
+                  icon: Icon(Icons.add, size: isVerySmall ? 20 : 24),
+                ),
               ],
             ),
             if (items.isEmpty)
-              Text('No items added', style: TextStyle(fontSize: fontSize, color: Colors.grey)),
+              Text(
+                'No items added',
+                style: TextStyle(fontSize: fontSize, color: Colors.grey),
+              ),
             ...items.asMap().entries.map((entry) {
               int idx = entry.key;
               var item = entry.value;
@@ -204,7 +294,12 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
               ),
               child: Text(
                 'Place Order',
-                style: TextStyle(fontSize: Responsive.getResponsiveFontSize(context, baseSize: 16)),
+                style: TextStyle(
+                  fontSize: Responsive.getResponsiveFontSize(
+                    context,
+                    baseSize: 16,
+                  ),
+                ),
               ),
             ),
           ],
@@ -252,14 +347,31 @@ class _AddItemDialogState extends ConsumerState<AddItemDialog> {
     final fontSize = Responsive.getResponsiveFontSize(context, baseSize: 13);
 
     return AlertDialog(
-      title: Text('Add Item', style: TextStyle(fontSize: Responsive.getResponsiveFontSize(context, baseSize: 18))),
+      title: Text(
+        'Add Item',
+        style: TextStyle(
+          fontSize: Responsive.getResponsiveFontSize(context, baseSize: 18),
+        ),
+      ),
       content: masterDataAsync.when(
-        loading: () => const SizedBox(height: 200, child: Center(child: CircularProgressIndicator())),
-        error: (err, _) => Text('Error loading master data: $err', style: TextStyle(fontSize: fontSize)),
+        loading: () => const SizedBox(
+          height: 200,
+          child: Center(child: CircularProgressIndicator()),
+        ),
+        error: (err, _) => Text(
+          'Error loading master data: $err',
+          style: TextStyle(fontSize: fontSize),
+        ),
         data: (masterData) {
           return stockAsync.when(
-            loading: () => const SizedBox(height: 200, child: Center(child: CircularProgressIndicator())),
-            error: (err, _) => Text('Error loading stock: $err', style: TextStyle(fontSize: fontSize)),
+            loading: () => const SizedBox(
+              height: 200,
+              child: Center(child: CircularProgressIndicator()),
+            ),
+            error: (err, _) => Text(
+              'Error loading stock: $err',
+              style: TextStyle(fontSize: fontSize),
+            ),
             data: (stockItems) {
               // If no stock items at all, show informative message and set OK-only
               if (stockItems.isEmpty) {
@@ -269,7 +381,11 @@ class _AddItemDialogState extends ConsumerState<AddItemDialog> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.info_outline, size: 48, color: Colors.orange),
+                      const Icon(
+                        Icons.info_outline,
+                        size: 48,
+                        color: Colors.orange,
+                      ),
                       const SizedBox(height: 12),
                       Text(
                         'No items available for sale.\n\n'
@@ -285,22 +401,36 @@ class _AddItemDialogState extends ConsumerState<AddItemDialog> {
               }
 
               //Filter crop categories to only those that have at least one crop with stock
-              final validCropCategories = masterData.cropCategories.where((cat) {
-                return masterData.crops.any((c) =>
-                    c.categoryCode == cat.code &&
-                    stockItems.any((stock) => stock.cropCode.toString() == c.code));
+              final validCropCategories = masterData.cropCategories.where((
+                cat,
+              ) {
+                return masterData.crops.any(
+                  (c) =>
+                      c.categoryCode == cat.code &&
+                      stockItems.any(
+                        (stock) => stock.cropCode.toString() == c.code,
+                      ),
+                );
               }).toList();
 
               // Filter crops based on selected category AND stock availability
               final filteredCrops = masterData.crops
-                  .where((c) =>
-                      c.categoryCode == _selectedCropCategoryCode &&
-                      stockItems.any((stock) => stock.cropCode.toString() == c.code))
+                  .where(
+                    (c) =>
+                        c.categoryCode == _selectedCropCategoryCode &&
+                        stockItems.any(
+                          (stock) => stock.cropCode.toString() == c.code,
+                        ),
+                  )
                   .toList();
 
               // Filter packaging options based on selected crop and stock
               final packagingOptions = stockItems
-                  .where((e) => _selectedCropCode == null || e.cropCode.toString() == _selectedCropCode)
+                  .where(
+                    (e) =>
+                        _selectedCropCode == null ||
+                        e.cropCode.toString() == _selectedCropCode,
+                  )
                   .toList();
 
               // If selected crop has no packaging options, show hint and set OK-only
@@ -311,7 +441,11 @@ class _AddItemDialogState extends ConsumerState<AddItemDialog> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.info_outline, size: 48, color: Colors.orange),
+                      const Icon(
+                        Icons.info_outline,
+                        size: 48,
+                        color: Colors.orange,
+                      ),
                       const SizedBox(height: 12),
                       Text(
                         'No stock available for the selected crop.\n\n'
@@ -327,7 +461,12 @@ class _AddItemDialogState extends ConsumerState<AddItemDialog> {
               // Normal state – show the form
               _showOKOnly = false;
               final selectedStockItems = packagingOptions
-                  .where((e) => _selectedPackagingCode == null || e.packagingTypeCode.toString() == _selectedPackagingCode)
+                  .where(
+                    (e) =>
+                        _selectedPackagingCode == null ||
+                        e.packagingTypeCode.toString() ==
+                            _selectedPackagingCode,
+                  )
                   .toList();
 
               final priceOptions = selectedStockItems
@@ -339,7 +478,8 @@ class _AddItemDialogState extends ConsumerState<AddItemDialog> {
               int maxQty = 0;
               if (_selectedPackagingCode != null) {
                 final stockItem = selectedStockItems.firstWhere(
-                  (e) => e.packagingTypeCode.toString() == _selectedPackagingCode,
+                  (e) =>
+                      e.packagingTypeCode.toString() == _selectedPackagingCode,
                   orElse: () => StockItemForSale(
                     cropCode: 0,
                     cropName: '',
@@ -351,16 +491,22 @@ class _AddItemDialogState extends ConsumerState<AddItemDialog> {
                 );
 
                 final usedQty = widget.cartItems
-                    .where((item) =>
-                        item.cropCode == int.tryParse(_selectedCropCode!) &&
-                        item.packagingTypeCode == int.tryParse(_selectedPackagingCode!))
+                    .where(
+                      (item) =>
+                          item.cropCode == int.tryParse(_selectedCropCode!) &&
+                          item.packagingTypeCode ==
+                              int.tryParse(_selectedPackagingCode!),
+                    )
                     .fold(0, (sum, item) => sum + item.quantity);
 
                 maxQty = stockItem.quantityAvailable - usedQty;
                 if (maxQty < 0) maxQty = 0;
               }
 
-              final quantityOptions = List<int>.generate(maxQty, (i) => i + 1).toList();
+              final quantityOptions = List<int>.generate(
+                maxQty,
+                (i) => i + 1,
+              ).toList();
 
               if (_selectedPrice == null && priceOptions.length == 1) {
                 WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -376,18 +522,28 @@ class _AddItemDialogState extends ConsumerState<AddItemDialog> {
                     // Crop Category dropdown (filtered)
                     DropdownButtonFormField<String>(
                       value: _selectedCropCategoryCode,
-                      hint: Text('Select Crop Category', style: TextStyle(fontSize: fontSize)),
+                      hint: Text(
+                        'Select Crop Category',
+                        style: TextStyle(fontSize: fontSize),
+                      ),
                       items: validCropCategories
                           .where((c) => c.code.isNotEmpty)
-                          .map((c) => DropdownMenuItem(
-                            value: c.code,
-                            child: Text(c.name, style: TextStyle(fontSize: fontSize)),
-                          ))
+                          .map(
+                            (c) => DropdownMenuItem(
+                              value: c.code,
+                              child: Text(
+                                c.name,
+                                style: TextStyle(fontSize: fontSize),
+                              ),
+                            ),
+                          )
                           .toList(),
                       onChanged: (code) {
                         setState(() {
                           _selectedCropCategoryCode = code;
-                          _selectedCropCategoryName = validCropCategories.firstWhere((c) => c.code == code).name;
+                          _selectedCropCategoryName = validCropCategories
+                              .firstWhere((c) => c.code == code)
+                              .name;
                           _selectedCropCode = null;
                           _selectedCropName = null;
                           _selectedPackagingCode = null;
@@ -399,7 +555,10 @@ class _AddItemDialogState extends ConsumerState<AddItemDialog> {
                       decoration: InputDecoration(
                         labelText: 'Crop Category',
                         labelStyle: TextStyle(fontSize: fontSize),
-                        contentPadding: EdgeInsets.symmetric(vertical: isVerySmall ? 4 : 8, horizontal: 8),
+                        contentPadding: EdgeInsets.symmetric(
+                          vertical: isVerySmall ? 4 : 8,
+                          horizontal: 8,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -410,18 +569,28 @@ class _AddItemDialogState extends ConsumerState<AddItemDialog> {
                         children: [
                           DropdownButtonFormField<String>(
                             value: _selectedCropCode,
-                            hint: Text('Select Crop', style: TextStyle(fontSize: fontSize)),
+                            hint: Text(
+                              'Select Crop',
+                              style: TextStyle(fontSize: fontSize),
+                            ),
                             items: filteredCrops
                                 .where((c) => c.code.isNotEmpty)
-                                .map((c) => DropdownMenuItem(
-                                  value: c.code,
-                                  child: Text(c.name, style: TextStyle(fontSize: fontSize)),
-                                ))
+                                .map(
+                                  (c) => DropdownMenuItem(
+                                    value: c.code,
+                                    child: Text(
+                                      c.name,
+                                      style: TextStyle(fontSize: fontSize),
+                                    ),
+                                  ),
+                                )
                                 .toList(),
                             onChanged: (code) {
                               setState(() {
                                 _selectedCropCode = code;
-                                _selectedCropName = filteredCrops.firstWhere((c) => c.code == code).name;
+                                _selectedCropName = filteredCrops
+                                    .firstWhere((c) => c.code == code)
+                                    .name;
                                 _selectedPackagingCode = null;
                                 _selectedPackagingName = null;
                                 _selectedQuantity = null;
@@ -431,7 +600,10 @@ class _AddItemDialogState extends ConsumerState<AddItemDialog> {
                             decoration: InputDecoration(
                               labelText: 'Crop',
                               labelStyle: TextStyle(fontSize: fontSize),
-                              contentPadding: EdgeInsets.symmetric(vertical: isVerySmall ? 4 : 8, horizontal: 8),
+                              contentPadding: EdgeInsets.symmetric(
+                                vertical: isVerySmall ? 4 : 8,
+                                horizontal: 8,
+                              ),
                             ),
                           ),
                           const SizedBox(height: 8),
@@ -444,18 +616,30 @@ class _AddItemDialogState extends ConsumerState<AddItemDialog> {
                         children: [
                           DropdownButtonFormField<String>(
                             value: _selectedPackagingCode,
-                            hint: Text('Select Packaging', style: TextStyle(fontSize: fontSize)),
+                            hint: Text(
+                              'Select Packaging',
+                              style: TextStyle(fontSize: fontSize),
+                            ),
                             items: packagingOptions
-                                .map((p) => DropdownMenuItem(
-                                  value: p.packagingTypeCode.toString(),
-                                  child: Text(p.packagingTypeName, style: TextStyle(fontSize: fontSize)),
-                                ))
+                                .map(
+                                  (p) => DropdownMenuItem(
+                                    value: p.packagingTypeCode.toString(),
+                                    child: Text(
+                                      p.packagingTypeName,
+                                      style: TextStyle(fontSize: fontSize),
+                                    ),
+                                  ),
+                                )
                                 .toList(),
                             onChanged: (code) {
                               setState(() {
                                 _selectedPackagingCode = code;
                                 _selectedPackagingName = packagingOptions
-                                    .firstWhere((p) => p.packagingTypeCode.toString() == code)
+                                    .firstWhere(
+                                      (p) =>
+                                          p.packagingTypeCode.toString() ==
+                                          code,
+                                    )
                                     .packagingTypeName;
                                 _selectedQuantity = null;
                                 _selectedPrice = null;
@@ -464,7 +648,10 @@ class _AddItemDialogState extends ConsumerState<AddItemDialog> {
                             decoration: InputDecoration(
                               labelText: 'Packaging',
                               labelStyle: TextStyle(fontSize: fontSize),
-                              contentPadding: EdgeInsets.symmetric(vertical: isVerySmall ? 4 : 8, horizontal: 8),
+                              contentPadding: EdgeInsets.symmetric(
+                                vertical: isVerySmall ? 4 : 8,
+                                horizontal: 8,
+                              ),
                             ),
                           ),
                           const SizedBox(height: 8),
@@ -475,38 +662,68 @@ class _AddItemDialogState extends ConsumerState<AddItemDialog> {
                     if (_selectedPackagingCode != null && maxQty > 0) ...[
                       DropdownButtonFormField<int>(
                         value: _selectedQuantity,
-                        hint: Text('Select Quantity', style: TextStyle(fontSize: fontSize)),
+                        hint: Text(
+                          'Select Quantity',
+                          style: TextStyle(fontSize: fontSize),
+                        ),
                         items: quantityOptions
-                            .map((q) => DropdownMenuItem(value: q, child: Text('$q', style: TextStyle(fontSize: fontSize))))
+                            .map(
+                              (q) => DropdownMenuItem(
+                                value: q,
+                                child: Text(
+                                  '$q',
+                                  style: TextStyle(fontSize: fontSize),
+                                ),
+                              ),
+                            )
                             .toList(),
-                        onChanged: (val) => setState(() => _selectedQuantity = val),
+                        onChanged: (val) =>
+                            setState(() => _selectedQuantity = val),
                         decoration: InputDecoration(
                           labelText: 'Quantity (max $maxQty)',
                           labelStyle: TextStyle(fontSize: fontSize),
-                          contentPadding: EdgeInsets.symmetric(vertical: isVerySmall ? 4 : 8, horizontal: 8),
+                          contentPadding: EdgeInsets.symmetric(
+                            vertical: isVerySmall ? 4 : 8,
+                            horizontal: 8,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 8),
                       DropdownButtonFormField<double>(
                         value: _selectedPrice,
-                        hint: Text('Select Price per unit', style: TextStyle(fontSize: fontSize)),
+                        hint: Text(
+                          'Select Price per unit',
+                          style: TextStyle(fontSize: fontSize),
+                        ),
                         items: priceOptions
-                            .map((p) => DropdownMenuItem(
-                              value: p,
-                              child: Text('₹${p!.toStringAsFixed(2)}', style: TextStyle(fontSize: fontSize)),
-                            ))
+                            .map(
+                              (p) => DropdownMenuItem(
+                                value: p,
+                                child: Text(
+                                  '₹${p!.toStringAsFixed(2)}',
+                                  style: TextStyle(fontSize: fontSize),
+                                ),
+                              ),
+                            )
                             .toList(),
-                        onChanged: (val) => setState(() => _selectedPrice = val),
+                        onChanged: (val) =>
+                            setState(() => _selectedPrice = val),
                         decoration: InputDecoration(
                           labelText: 'Price per unit',
                           labelStyle: TextStyle(fontSize: fontSize),
-                          contentPadding: EdgeInsets.symmetric(vertical: isVerySmall ? 4 : 8, horizontal: 8),
+                          contentPadding: EdgeInsets.symmetric(
+                            vertical: isVerySmall ? 4 : 8,
+                            horizontal: 8,
+                          ),
                         ),
                       ),
                     ] else if (_selectedPackagingCode != null && maxQty == 0)
                       const Padding(
                         padding: EdgeInsets.all(8.0),
-                        child: Text('Out of stock', style: TextStyle(color: Colors.red)),
+                        child: Text(
+                          'Out of stock',
+                          style: TextStyle(color: Colors.red),
+                        ),
                       ),
                   ],
                 ),
@@ -531,7 +748,10 @@ class _AddItemDialogState extends ConsumerState<AddItemDialog> {
               // Normal Cancel + Add buttons
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                style: TextButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+                style: TextButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  foregroundColor: Colors.white,
+                ),
                 child: const Text('Cancel'),
               ),
               ElevatedButton(
@@ -550,7 +770,8 @@ class _AddItemDialogState extends ConsumerState<AddItemDialog> {
                   final total = qty * price;
                   final item = SalesOrderItem(
                     cropCode: int.tryParse(_selectedCropCode!) ?? 0,
-                    packagingTypeCode: int.tryParse(_selectedPackagingCode!) ?? 0,
+                    packagingTypeCode:
+                        int.tryParse(_selectedPackagingCode!) ?? 0,
                     cropName: _selectedCropName ?? '',
                     packagingTypeName: _selectedPackagingName ?? '',
                     quantity: qty,
@@ -563,9 +784,20 @@ class _AddItemDialogState extends ConsumerState<AddItemDialog> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.green[700],
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 10,
+                    horizontal: 16,
+                  ),
                 ),
-                child: Text('Add', style: TextStyle(fontSize: Responsive.getResponsiveFontSize(context, baseSize: 14))),
+                child: Text(
+                  'Add',
+                  style: TextStyle(
+                    fontSize: Responsive.getResponsiveFontSize(
+                      context,
+                      baseSize: 14,
+                    ),
+                  ),
+                ),
               ),
             ],
     );
