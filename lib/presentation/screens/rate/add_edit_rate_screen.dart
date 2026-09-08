@@ -24,7 +24,6 @@ class _AddEditRateScreenState extends ConsumerState<AddEditRateScreen> {
   String? _selectedCropCode;
   String? _selectedPackagingTypeCode;
   String? _selectedUnitCode;
-  String? _quantity;
   String? _amount;
   DateTime? _appliesFrom;
 
@@ -35,7 +34,6 @@ class _AddEditRateScreenState extends ConsumerState<AddEditRateScreen> {
       _selectedCropCode = widget.rate!.cropCode;
       _selectedPackagingTypeCode = widget.rate!.packagingTypeCode;
       _selectedUnitCode = widget.rate!.unitCode;
-      _quantity = widget.rate!.quantity;
       _amount = widget.rate!.amount;
       _appliesFrom = widget.rate!.appliesFrom != null
           ? DateFormat('yyyy-MM-dd').parse(widget.rate!.appliesFrom!)
@@ -192,22 +190,6 @@ class _AddEditRateScreenState extends ConsumerState<AddEditRateScreen> {
                   ),
                   SizedBox(height: isVerySmall ? 8 : 12),
 
-                  // Quantity field (editable)
-                  TextFormField(
-                    initialValue: _quantity,
-                    decoration: InputDecoration(
-                      labelText: 'Quantity',
-                      isDense: true,
-                      contentPadding: isVerySmall
-                          ? const EdgeInsets.symmetric(horizontal: 8, vertical: 8)
-                          : null,
-                    ),
-                    keyboardType: TextInputType.number,
-                    onChanged: (val) => _quantity = val,
-                    validator: (v) => v!.isEmpty ? 'Required' : null,
-                  ),
-                  SizedBox(height: isVerySmall ? 8 : 12),
-
                   // Unit dropdown (always editable)
                   DropdownButtonFormField<String>(
                     initialValue: _selectedUnitCode,
@@ -232,11 +214,11 @@ class _AddEditRateScreenState extends ConsumerState<AddEditRateScreen> {
                   ),
                   SizedBox(height: isVerySmall ? 8 : 12),
 
-                  // Amount field (editable)
+                  // Amount per Unit field (editable)
                   TextFormField(
                     initialValue: _amount,
                     decoration: InputDecoration(
-                      labelText: 'Amount (₹)',
+                      labelText: 'Amount per Unit (₹)',
                       isDense: true,
                       contentPadding: isVerySmall
                           ? const EdgeInsets.symmetric(horizontal: 8, vertical: 8)
@@ -244,7 +226,7 @@ class _AddEditRateScreenState extends ConsumerState<AddEditRateScreen> {
                     ),
                     keyboardType: TextInputType.number,
                     onChanged: (val) => _amount = val,
-                    validator: (v) => v!.isEmpty ? 'Required' : null,
+                    validator: (v) => v == null || v.isEmpty ? 'Required' : null,
                   ),
                   SizedBox(height: isVerySmall ? 8 : 12),
 
@@ -273,6 +255,12 @@ class _AddEditRateScreenState extends ConsumerState<AddEditRateScreen> {
                   ElevatedButton(
                     onPressed: () async {
                       if (!_formKey.currentState!.validate()) return;
+                      if (_appliesFrom == null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Please select Applies From date')),
+                        );
+                        return;
+                      }
                       if (user == null) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text('User not logged in')),
@@ -284,7 +272,7 @@ class _AddEditRateScreenState extends ConsumerState<AddEditRateScreen> {
                         'hubCode': hubCode.toString(),
                         'cropCode': _selectedCropCode!,
                         'packagingTypeCode': _selectedPackagingTypeCode!,
-                        'quantity': _quantity!,
+                        'quantity': '1', // Hardcoded base unit quantity for API DTO compliance
                         'unitCode': _selectedUnitCode!,
                         'amount': _amount!,
                         'appliesFrom': DateFormat('yyyy-MM-dd').format(_appliesFrom!),

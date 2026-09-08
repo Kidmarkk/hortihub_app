@@ -1,7 +1,7 @@
 class ApiConstants {
   
-  static const String baseUrl = 'http://164.100.123.175/api';
-  //static const String baseUrl = 'https://hortihub.megagriculture.gov.in/api'; //production
+  //static const String baseUrl = 'http://164.100.123.175/api';
+  static const String baseUrl = 'https://hortihub.megagriculture.gov.in/api'; //production
   //static const String baseUrl = 'http://10.0.2.2:8081/hortihub/api';
 
   // Auth

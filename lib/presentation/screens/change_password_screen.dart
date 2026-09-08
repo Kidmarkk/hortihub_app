@@ -99,7 +99,7 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
       final payload = <String, String>{
         'oldPassword': oldHashed,
         'newPassword': newHashed,
-        'userName': user.userId,
+        'username': user.userId,
       };
 
       final api = ApiService();

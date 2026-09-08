@@ -4,8 +4,12 @@
 
 list(APPEND FLUTTER_PLUGIN_LIST
   flutter_secure_storage_windows
+  flutter_thermal_printer
+  permission_handler_windows
   printing
   share_plus
+  unified_esc_pos_printer
+  universal_ble
   url_launcher_windows
 )
 

@@ -30,10 +30,14 @@ class _ViewAllSalesScreenState extends ConsumerState<ViewAllSalesScreen> {
       final tempDir = await getTemporaryDirectory();
       final file = File('${tempDir.path}/invoice_$salesOrderCode.pdf');
       await file.writeAsBytes(bytes);
-      await Share.shareXFiles([XFile(file.path)], text: 'Invoice for Sale Order $salesOrderCode');
+      await Share.shareXFiles([
+        XFile(file.path),
+      ], text: 'Invoice for Sale Order $salesOrderCode');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to generate invoice: $e')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to generate invoice: $e')));
     }
   }
 
@@ -55,15 +59,23 @@ class _ViewAllSalesScreenState extends ConsumerState<ViewAllSalesScreen> {
               Text('District: ${sale.districtName ?? 'N/A'}'),
               Text('Total: ₹${sale.totalPrice}'),
               const SizedBox(height: 8),
-              const Text('Items:', style: TextStyle(fontWeight: FontWeight.bold)),
+              const Text(
+                'Items:',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
               ...(sale.items ?? []).map(
-                (item) => Text('${item.cropName} x${item.quantity} = ₹${item.totalPrice}'),
+                (item) => Text(
+                  '${item.cropName} x${item.quantity} = ₹${item.totalPrice}',
+                ),
               ),
             ],
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Close'),
+          ),
         ],
       ),
     );
@@ -79,7 +91,9 @@ class _ViewAllSalesScreenState extends ConsumerState<ViewAllSalesScreen> {
     final padding = EdgeInsets.all(Responsive.getResponsivePadding(context));
 
     // For hubuser, auto-set the hub if not set
-    if (user?.userRole == 'HUBUSER' && selectedHub == null && user?.hubCode != null) {
+    if (user?.userRole == 'HUBUSER' &&
+        selectedHub == null &&
+        user?.hubCode != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         ref.read(selectedHubProvider.notifier).state = user?.hubCode;
       });
@@ -115,7 +129,10 @@ class _ViewAllSalesScreenState extends ConsumerState<ViewAllSalesScreen> {
                         const SizedBox(height: 8),
                         Text(
                           'Select a district and hub to view sales data',
-                          style: TextStyle(color: Colors.grey, fontSize: fontSize),
+                          style: TextStyle(
+                            color: Colors.grey,
+                            fontSize: fontSize,
+                          ),
                           textAlign: TextAlign.center,
                         ),
                       ],
@@ -123,12 +140,20 @@ class _ViewAllSalesScreenState extends ConsumerState<ViewAllSalesScreen> {
                   )
                 : Consumer(
                     builder: (ctx, ref, _) {
-                      final salesAsync = ref.watch(salesListProvider(selectedHub!));
+                      final salesAsync = ref.watch(
+                        salesListProvider(selectedHub!),
+                      );
                       return salesAsync.when(
-                        loading: () => const Center(child: CircularProgressIndicator()),
+                        loading: () =>
+                            const Center(child: CircularProgressIndicator()),
                         error: (err, _) => Center(child: Text('Error: $err')),
                         data: (sales) => sales.isEmpty
-                            ? Center(child: Text('No sales found', style: TextStyle(fontSize: fontSize)))
+                            ? Center(
+                                child: Text(
+                                  'No sales found',
+                                  style: TextStyle(fontSize: fontSize),
+                                ),
+                              )
                             : ListView.builder(
                                 padding: padding,
                                 itemCount: sales.length,
@@ -137,11 +162,19 @@ class _ViewAllSalesScreenState extends ConsumerState<ViewAllSalesScreen> {
                                   return Card(
                                     margin: EdgeInsets.symmetric(
                                       vertical: 4,
-                                      horizontal: Responsive.getResponsivePadding(context, basePadding: 4),
+                                      horizontal:
+                                          Responsive.getResponsivePadding(
+                                            context,
+                                            basePadding: 4,
+                                          ),
                                     ),
                                     child: ListTile(
                                       contentPadding: EdgeInsets.symmetric(
-                                        horizontal: Responsive.getResponsivePadding(context, basePadding: 12),
+                                        horizontal:
+                                            Responsive.getResponsivePadding(
+                                              context,
+                                              basePadding: 12,
+                                            ),
                                         vertical: 4,
                                       ),
                                       title: Text(
@@ -150,30 +183,62 @@ class _ViewAllSalesScreenState extends ConsumerState<ViewAllSalesScreen> {
                                       ),
                                       subtitle: Text(
                                         '₹${sale.totalPrice} | ${sale.entrydate}',
-                                        style: TextStyle(fontSize: fontSize * 0.85),
+                                        style: TextStyle(
+                                          fontSize: fontSize * 0.85,
+                                        ),
                                       ),
                                       trailing: Row(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
                                           IconButton(
-                                            icon: const Icon(Icons.picture_as_pdf),
+                                            icon: const Icon(
+                                              Icons.print,
+                                              color: Colors.blue,
+                                            ),
+                                            tooltip: 'Print Receipt',
+                                            onPressed: () {
+                                              NewSaleScreen.printReceiptDialog(
+                                                context: context,
+                                                ref: ref,
+                                                sale: sale,
+                                                hubCode: widget.hubCode ?? '', // or your selected hub code variable
+                                              );
+                                            },
+                                          ),
+                                          IconButton(
+                                            icon: const Icon(
+                                              Icons.picture_as_pdf,
+                                            ),
                                             color: Colors.redAccent,
                                             iconSize: iconSize,
                                             padding: EdgeInsets.zero,
                                             constraints: const BoxConstraints(),
                                             onPressed: () {
-                                              if (user != null && sale.salesOrderCode != null) {
-                                                _downloadInvoice(sale.salesOrderCode!.toString(), user.token);
+                                              if (user != null &&
+                                                  sale.salesOrderCode != null) {
+                                                _downloadInvoice(
+                                                  sale.salesOrderCode!
+                                                      .toString(),
+                                                  user.token,
+                                                );
                                               } else {
-                                                ScaffoldMessenger.of(context).showSnackBar(
-                                                  const SnackBar(content: Text('User not logged in or order code missing')),
+                                                ScaffoldMessenger.of(
+                                                  context,
+                                                ).showSnackBar(
+                                                  const SnackBar(
+                                                    content: Text(
+                                                      'User not logged in or order code missing',
+                                                    ),
+                                                  ),
                                                 );
                                               }
                                             },
                                             tooltip: 'Invoice',
                                           ),
                                           IconButton(
-                                            icon: const Icon(Icons.remove_red_eye),
+                                            icon: const Icon(
+                                              Icons.remove_red_eye,
+                                            ),
                                             color: Colors.blue[700],
                                             iconSize: iconSize,
                                             padding: EdgeInsets.zero,
@@ -198,9 +263,15 @@ class _ViewAllSalesScreenState extends ConsumerState<ViewAllSalesScreen> {
               backgroundColor: const Color(0xFF388E3C),
               onPressed: () => Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => NewSaleScreen(hubCode: selectedHub!)),
+                MaterialPageRoute(
+                  builder: (_) => NewSaleScreen(hubCode: selectedHub!),
+                ),
               ),
-              child: Icon(Icons.add, color: Colors.white, size: isVerySmall ? 20 : 24),
+              child: Icon(
+                Icons.add,
+                color: Colors.white,
+                size: isVerySmall ? 20 : 24,
+              ),
             )
           : null,
     );

@@ -1,4 +1,4 @@
-package com.example.hortihub_new_app
+package com.nic.hortihub
 
 import io.flutter.embedding.android.FlutterActivity
 

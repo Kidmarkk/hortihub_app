@@ -1,8 +1,12 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hortihub_new_app/core/utils/responsive.dart';
 import 'package:hortihub_new_app/presentation/providers/master_data_provider.dart';
-import 'package:hortihub_new_app/services/print_service.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:hortihub_new_app/services/thermal_printer_service.dart';
+
 import '../../providers/auth_provider.dart';
 import '../../providers/sales_provider.dart';
 import '../../../data/models/sales_models.dart';
@@ -10,6 +14,167 @@ import '../../../data/models/sales_models.dart';
 class NewSaleScreen extends ConsumerStatefulWidget {
   final String hubCode;
   const NewSaleScreen({super.key, required this.hubCode});
+
+  static Future<bool> _checkBluetoothPermissions() async {
+    if (Platform.isAndroid) {
+      if (await Permission.bluetooth.isGranted &&
+          await Permission.bluetoothConnect.isGranted &&
+          await Permission.bluetoothScan.isGranted) {
+        return true;
+      }
+      // Request permissions
+      Map<Permission, PermissionStatus> statuses = await [
+        Permission.bluetooth,
+        Permission.bluetoothConnect,
+        Permission.bluetoothScan,
+      ].request();
+      return statuses[Permission.bluetooth]!.isGranted &&
+          statuses[Permission.bluetoothConnect]!.isGranted &&
+          statuses[Permission.bluetoothScan]!.isGranted;
+    }
+    return true; // iOS handles permissions differently
+  }
+
+  // Reusable static method to show confirmation dialog and print receipt
+  static Future<void> printReceiptDialog({
+    required BuildContext context,
+    required WidgetRef ref,
+    required SalesOrder sale,
+    required String hubCode,
+  }) async {
+    // 1. Prompt User Confirmation
+    final shouldPrint = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Print Receipt'),
+        content: const Text('Do you want to print this receipt?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('No'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Yes'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldPrint != true) return;
+
+    if (!context.mounted) return;
+
+    // 2. Show loading modal while sending bytes to printer
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const Center(
+        child: Card(
+          child: Padding(
+            padding: EdgeInsets.all(20.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text("Printing receipt..."),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    bool printedSuccessfully = false;
+
+    try {
+      final user = ref.read(authStateProvider).value;
+      String? currentHubName = sale.hubName;
+      String? currentDistrictName = sale.districtName;
+
+      // Resolve district name from auth state
+      String resolveDistrictName(String? districtCode) {
+        if (districtCode == null || districtCode.isEmpty) return '';
+        if (user == null) return districtCode;
+        if (user.userRole == 'DISTRICTUSER' && user.districtName != null) {
+          return user.districtName!;
+        }
+        final match = user.listDistricts.firstWhere(
+          (d) => d['key'] == districtCode,
+          orElse: () => {'value': districtCode},
+        );
+        return match['value'] ?? districtCode;
+      }
+
+      if (user != null) {
+        if (user.listHubs.isNotEmpty) {
+          final match = user.listHubs.firstWhere(
+            (h) => h['key'].toString() == hubCode.toString(),
+            orElse: () => {},
+          );
+          if (match.containsKey('value') &&
+              match['value'].toString().isNotEmpty) {
+            currentHubName = match['value'].toString();
+          }
+          if (match.containsKey('value1')) {
+            currentDistrictName = resolveDistrictName(
+              match['value1'].toString(),
+            );
+          }
+        } else if (user.hubCode != null) {
+          currentHubName = user.hubName ?? 'HUB ${user.hubCode}';
+          currentDistrictName = resolveDistrictName(user.districtCode);
+        }
+      }
+
+      final orderData = {
+        'hubName': currentHubName,
+        'districtName': currentDistrictName,
+        'receiptNo': sale.salesOrderCode?.toString() ?? 'N/A',
+        'buyerName': sale.buyerName,
+        'date': DateTime.now().toString().split(' ')[0],
+        'total': (sale.totalPrice ?? 0.0).toStringAsFixed(2),
+        'items': sale.items
+            .map(
+              (item) => {
+                'name': '${item.cropName} (${item.packagingTypeName})',
+                'qty': item.quantity,
+                'price': (item.totalPrice ?? 0.0).toStringAsFixed(2),
+              },
+            )
+            .toList(),
+      };
+
+      debugPrint('Order Data: $orderData');
+
+      // Print execution
+      ThermalPrinterService printer = ThermalPrinterService();
+      printedSuccessfully = await printer.printReceipt(context, orderData);
+    } catch (e) {
+      debugPrint("Printing execution error: $e");
+    } finally {
+      if (context.mounted) Navigator.of(context).pop(); // Dismiss loading modal
+    }
+
+    // 3. User feedback SnackBar
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            printedSuccessfully
+                ? 'Receipt printed successfully!'
+                : 'Could not connect to printer. Please ensure:\n'
+                      '• USB cable is properly connected\n'
+                      '• Printer is powered ON\n'
+                      '• Bluetooth is enabled (required for USB detection)\n'
+                      '• You have granted USB permission when prompted',
+          ),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
+  }
 
   @override
   ConsumerState<NewSaleScreen> createState() => _NewSaleScreenState();
@@ -87,71 +252,27 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
     await Future.delayed(const Duration(milliseconds: 800));
     final salesList = await ref.read(salesListProvider(widget.hubCode).future);
 
-    // Find the newly created sale – we assume it’s the first one (most recent) and matches the buyer name
+    // Find the newly created sale
     final newSale = salesList.isNotEmpty
         ? salesList.firstWhere(
             (s) => s.buyerName == order.buyerName,
             orElse: () => salesList.first,
           )
-        : null;
+        : order;
 
     if (mounted) {
-      // Ask if user wants to print the receipt
-      final shouldPrint = await showDialog<bool>(
+      // Trigger prompt and printing workflow
+      await NewSaleScreen.printReceiptDialog(
         context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Print Receipt'),
-          content: const Text('Do you want to print this receipt?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('No'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Yes'),
-            ),
-          ],
-        ),
+        ref: ref,
+        sale: newSale,
+        hubCode: widget.hubCode,
       );
 
-      if (shouldPrint == true) {
-        if (newSale != null && newSale.salesOrderCode != null) {
-          try {
-            // Generate the invoice using the fetched salesOrderCode
-            final repo = ref.read(salesRepositoryProvider);
-            final base64 = await repo.generateInvoice(
-              newSale.salesOrderCode!.toString(),
-              user!.token,
-            );
-            // Send to system print dialog
-            await PrintService.printReceipt(base64);
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Receipt sent to printer')),
-            );
-          } catch (e) {
-            ScaffoldMessenger.of(
-              context,
-            ).showSnackBar(SnackBar(content: Text('Print failed: $e')));
-          }
-        } else {
-          // If we couldn't get the order code, inform the user
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Sale created, but the receipt could not be generated. You can print it from the sales list.',
-              ),
-              duration: Duration(seconds: 4),
-            ),
-          );
-        }
+      // Close New Sale Screen and navigate back
+      if (mounted) {
+        Navigator.pop(context);
       }
-
-      // Finally, show success and pop
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Sale created successfully')),
-      );
-      Navigator.pop(context);
     }
   }
 
@@ -176,7 +297,6 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
         child: ListView(
           padding: EdgeInsets.all(padding),
           children: [
-            // ... buyer details fields (unchanged)
             Text(
               'Buyer Details',
               style: TextStyle(
@@ -261,7 +381,7 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
               int idx = entry.key;
               var item = entry.value;
               return Card(
-                margin: EdgeInsets.symmetric(vertical: 4),
+                margin: const EdgeInsets.symmetric(vertical: 4),
                 child: ListTile(
                   contentPadding: EdgeInsets.symmetric(
                     horizontal: padding,
@@ -336,7 +456,6 @@ class _AddItemDialogState extends ConsumerState<AddItemDialog> {
   int? _selectedQuantity;
   double? _selectedPrice;
 
-  // Track whether to show only an OK button
   bool _showOKOnly = false;
 
   @override
@@ -373,7 +492,6 @@ class _AddItemDialogState extends ConsumerState<AddItemDialog> {
               style: TextStyle(fontSize: fontSize),
             ),
             data: (stockItems) {
-              // If no stock items at all, show informative message and set OK-only
               if (stockItems.isEmpty) {
                 _showOKOnly = true;
                 return SizedBox(
@@ -400,7 +518,6 @@ class _AddItemDialogState extends ConsumerState<AddItemDialog> {
                 );
               }
 
-              //Filter crop categories to only those that have at least one crop with stock
               final validCropCategories = masterData.cropCategories.where((
                 cat,
               ) {
@@ -413,7 +530,6 @@ class _AddItemDialogState extends ConsumerState<AddItemDialog> {
                 );
               }).toList();
 
-              // Filter crops based on selected category AND stock availability
               final filteredCrops = masterData.crops
                   .where(
                     (c) =>
@@ -424,7 +540,6 @@ class _AddItemDialogState extends ConsumerState<AddItemDialog> {
                   )
                   .toList();
 
-              // Filter packaging options based on selected crop and stock
               final packagingOptions = stockItems
                   .where(
                     (e) =>
@@ -433,7 +548,6 @@ class _AddItemDialogState extends ConsumerState<AddItemDialog> {
                   )
                   .toList();
 
-              // If selected crop has no packaging options, show hint and set OK-only
               if (_selectedCropCode != null && packagingOptions.isEmpty) {
                 _showOKOnly = true;
                 return SizedBox(
@@ -458,7 +572,6 @@ class _AddItemDialogState extends ConsumerState<AddItemDialog> {
                 );
               }
 
-              // Normal state – show the form
               _showOKOnly = false;
               final selectedStockItems = packagingOptions
                   .where(
@@ -519,7 +632,6 @@ class _AddItemDialogState extends ConsumerState<AddItemDialog> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Crop Category dropdown (filtered)
                     DropdownButtonFormField<String>(
                       value: _selectedCropCategoryCode,
                       hint: Text(
@@ -562,8 +674,6 @@ class _AddItemDialogState extends ConsumerState<AddItemDialog> {
                       ),
                     ),
                     const SizedBox(height: 8),
-
-                    // Crop dropdown (only if category selected, filtered by stock)
                     if (_selectedCropCategoryCode != null)
                       Column(
                         children: [
@@ -609,8 +719,6 @@ class _AddItemDialogState extends ConsumerState<AddItemDialog> {
                           const SizedBox(height: 8),
                         ],
                       ),
-
-                    // Packaging dropdown (only if crop selected)
                     if (_selectedCropCode != null)
                       Column(
                         children: [
@@ -657,8 +765,6 @@ class _AddItemDialogState extends ConsumerState<AddItemDialog> {
                           const SizedBox(height: 8),
                         ],
                       ),
-
-                    // Quantity and Price (only if packaging selected and maxQty > 0)
                     if (_selectedPackagingCode != null && maxQty > 0) ...[
                       DropdownButtonFormField<int>(
                         value: _selectedQuantity,
@@ -734,7 +840,6 @@ class _AddItemDialogState extends ConsumerState<AddItemDialog> {
       ),
       actions: _showOKOnly
           ? [
-              // Single OK button when no stock or no packaging
               TextButton(
                 onPressed: () => Navigator.pop(context),
                 style: TextButton.styleFrom(
@@ -745,7 +850,6 @@ class _AddItemDialogState extends ConsumerState<AddItemDialog> {
               ),
             ]
           : [
-              // Normal Cancel + Add buttons
               TextButton(
                 onPressed: () => Navigator.pop(context),
                 style: TextButton.styleFrom(
