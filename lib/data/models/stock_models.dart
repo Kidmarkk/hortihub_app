@@ -5,6 +5,7 @@ class StockItem {
   final int? packagingTypeCode;
   final int? unitCode;
   final int? quantityAvailable;
+  final int? quantityDamaged;
   final String? isAvailable;
   final String? hubName;
   final String? cropName;
@@ -25,6 +26,7 @@ class StockItem {
     this.packagingTypeCode,
     this.unitCode,
     this.quantityAvailable,
+    this.quantityDamaged,
     this.isAvailable,
     this.hubName,
     this.cropName,
@@ -46,6 +48,7 @@ class StockItem {
     packagingTypeCode: int.tryParse(json['packagingTypeCode']?.toString() ?? ''),
     unitCode: int.tryParse(json['unitCode']?.toString() ?? ''),
     quantityAvailable: int.tryParse(json['quantityAvailable']?.toString() ?? ''),
+    quantityDamaged: int.tryParse(json['quantityDamaged']?.toString() ?? ''), 
     isAvailable: json['isAvailable'],
     hubName: json['hubName'],
     cropName: json['cropName'],
@@ -67,6 +70,7 @@ class StockItem {
     'packagingTypeCode': packagingTypeCode,
     'unitCode': unitCode,
     'quantityAvailable': quantityAvailable,
+    'quantityDamaged': quantityDamaged,
     'isAvailable': isAvailable,
     'hubName': hubName,
     'cropName': cropName,

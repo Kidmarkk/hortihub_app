@@ -3,12 +3,12 @@ import 'dart:typed_data';
 import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_thermal_printer/utils/printer.dart';
-import 'package:unified_esc_pos_printer/unified_esc_pos_printer.dart' hide CapabilityProfile, Generator, PaperSize;
+import 'package:unified_esc_pos_printer/unified_esc_pos_printer.dart'
+    hide CapabilityProfile, Generator, PaperSize;
 
 class ThermalPrinterService {
   final PrinterManager _manager = PrinterManager();
 
-  // ✅ Keep your receipt builder – works exactly the same
   Future<Uint8List> _buildReceiptBytes(Map<String, dynamic> orderData) async {
     final profile = await CapabilityProfile.load();
     final generator = Generator(PaperSize.mm80, profile);
@@ -28,7 +28,7 @@ class ThermalPrinterService {
         align: PosAlign.center,
         bold: true,
         height: PosTextSize.size2,
-        width: PosTextSize.size2,
+        width: PosTextSize.size1,
       ),
     );
     if (districtTitle.isNotEmpty) {
@@ -38,7 +38,7 @@ class ThermalPrinterService {
       );
     }
     bytes += generator.text(
-      'MEG HORTICULTURE HUB',
+      'GOVERNMENT OF MEGHALAYA',
       styles: const PosStyles(align: PosAlign.center, bold: true),
     );
     bytes += generator.text(
@@ -71,10 +71,14 @@ class ThermalPrinterService {
     );
     List items = orderData['items'] ?? [];
     for (var item in items) {
+      final qty = item['qty'].toString();
+      final unit = item['unit']?.toString() ?? '';
+      final qtyWithUnit = unit.isNotEmpty ? '$qty $unit' : qty;
+
       bytes += generator.row([
         PosColumn(text: item['name'].toString(), width: 6),
         PosColumn(
-          text: item['qty'].toString(),
+          text: qtyWithUnit,
           width: 2,
           styles: const PosStyles(align: PosAlign.center),
         ),
@@ -94,7 +98,7 @@ class ThermalPrinterService {
       styles: const PosStyles(
         align: PosAlign.right,
         bold: true,
-        height: PosTextSize.size2,
+        height: PosTextSize.size1,
         width: PosTextSize.size1,
       ),
     );
@@ -147,9 +151,9 @@ class ThermalPrinterService {
   ) async {
     try {
       // 1. Scan for printers (USB + Bluetooth)
-      final devices = await _manager.scanAll(
-        timeout: const Duration(seconds: 5),
-      ).first;
+      final devices = await _manager
+          .scanAll(timeout: const Duration(seconds: 5))
+          .first;
 
       if (devices.isEmpty) {
         debugPrint('No printers found.');

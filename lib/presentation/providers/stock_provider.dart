@@ -15,9 +15,10 @@ final stockListProvider = FutureProvider.family<List<StockItem>, String>((
 });
 
 // Notifier for add/edit stock
-final addStockNotifierProvider = StateNotifierProvider<AddStockNotifier, AsyncValue<void>>((ref) {
-  return AddStockNotifier(ref.read(stockRepositoryProvider));
-});
+final addStockNotifierProvider =
+    StateNotifierProvider<AddStockNotifier, AsyncValue<void>>((ref) {
+      return AddStockNotifier(ref.read(stockRepositoryProvider));
+    });
 
 class AddStockNotifier extends StateNotifier<AsyncValue<void>> {
   final StockRepository _repo;
@@ -45,6 +46,31 @@ class AddStockNotifier extends StateNotifier<AsyncValue<void>> {
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
+    }
+  }
+
+  Future<String> updateAvailability({
+    required String hubCode,
+    required String userCode,
+    String? districtCode,
+    required List<String> isAvailableArray,
+    required List<String> isNotAvailableArray,
+  }) async {
+    state = const AsyncValue.loading();
+    try {
+      final message = await _repo.updateAvailability(
+        hubCode: hubCode,
+        userCode: userCode,
+        districtCode: districtCode,
+        isAvailableArray: isAvailableArray,
+        isNotAvailableArray: isNotAvailableArray,
+      );
+      _lastResponseMessage = message;
+      state = const AsyncValue.data(null);
+      return message;
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      rethrow;
     }
   }
 

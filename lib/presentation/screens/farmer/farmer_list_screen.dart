@@ -71,7 +71,7 @@ class _FarmerListScreenState extends ConsumerState<FarmerListScreen> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         ref.read(selectedHubProvider.notifier).state = user?.hubCode;
       });
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(body: Center(child: CircularProgressIndicator(color: Color(0xFF388E3C))));
     }
 
     return Scaffold(
@@ -99,7 +99,7 @@ class _FarmerListScreenState extends ConsumerState<FarmerListScreen> {
                     builder: (ctx, ref, _) {
                       final farmersAsync = ref.watch(farmerListProvider(selectedHub!));
                       return farmersAsync.when(
-                        loading: () => const Center(child: CircularProgressIndicator()),
+                        loading: () => const Center(child: CircularProgressIndicator(color: Color(0xFF388E3C))),
                         error: (err, _) => Center(child: Text('Error: $err')),
                         data: (farmers) => farmers.isEmpty
                             ? const Center(child: Text('No farmers found'))

@@ -3,12 +3,14 @@ class Hub {
   final String name;
   final String districtCode;
   final String? districtName;
+  final String? imageBase64;
 
   Hub({
     required this.code,
     required this.name,
     required this.districtCode,
     this.districtName,
+    this.imageBase64,
   });
 
   factory Hub.fromMap(
@@ -28,6 +30,7 @@ class Hub {
       name: map['value'] ?? '',
       districtCode: districtCode,
       districtName: districtName,
+      imageBase64: map['imageBase64'] ?? '',
     );
   }
 }

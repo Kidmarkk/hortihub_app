@@ -30,19 +30,29 @@ class SalesOrder {
   });
 
   factory SalesOrder.fromJson(Map<String, dynamic> json) => SalesOrder(
-    salesOrderCode: json['salesOrderCode'] != null ? int.tryParse(json['salesOrderCode'].toString()) : null,
+    salesOrderCode: json['salesOrderCode'] != null
+        ? int.tryParse(json['salesOrderCode'].toString())
+        : null,
     hubCode: int.tryParse(json['hubCode'].toString()) ?? 0,
     buyerName: json['buyerName'] ?? '',
     buyerAddress: json['buyerAddress'] ?? '',
     buyerMobile: json['buyerMobile'],
     receiptno: json['receiptno'],
     entrydate: json['entrydate'],
-    totalPrice: json['totalPrice'] != null ? double.tryParse(json['totalPrice'].toString()) : null,
+    totalPrice: json['totalPrice'] != null
+        ? double.tryParse(json['totalPrice'].toString())
+        : null,
     hubName: json['hubName'],
-    districtCode: json['districtCode'] != null ? int.tryParse(json['districtCode'].toString()) : null,
+    districtCode: json['districtCode'] != null
+        ? int.tryParse(json['districtCode'].toString())
+        : null,
     districtName: json['districtName'],
     userCode: int.tryParse(json['userCode'].toString()) ?? 0,
-    items: (json['items'] as List?)?.map((i) => SalesOrderItem.fromJson(i)).toList() ?? [],
+    items:
+        (json['items'] as List?)
+            ?.map((i) => SalesOrderItem.fromJson(i))
+            .toList() ??
+        [],
   );
 
   Map<String, dynamic> toJson() => {
@@ -68,6 +78,7 @@ class SalesOrderItem {
   String? cropCategoryName;
   String? cropName;
   String? packagingTypeName;
+  String? unitName;
   double itemPrice;
   int quantity;
   double totalPrice;
@@ -80,6 +91,7 @@ class SalesOrderItem {
     this.cropCategoryName,
     this.cropName,
     this.packagingTypeName,
+    this.unitName,
     required this.itemPrice,
     required this.quantity,
     required this.totalPrice,
@@ -87,18 +99,27 @@ class SalesOrderItem {
     required this.packagingTypeCode,
   });
 
-  factory SalesOrderItem.fromJson(Map<String, dynamic> json) => SalesOrderItem(
-    salesOrderCode: json['salesOrderCode'] != null ? int.tryParse(json['salesOrderCode'].toString()) : null,
-    salesOrderItemCode: json['salesOrderItemCode'] != null ? int.tryParse(json['salesOrderItemCode'].toString()) : null,
-    cropCategoryName: json['cropCategoryName'],
-    cropName: json['cropName'],
-    packagingTypeName: json['packagingTypeName'],
-    itemPrice: double.tryParse(json['itemPrice'].toString()) ?? 0.0,
-    quantity: int.tryParse(json['quantity'].toString()) ?? 0,
-    totalPrice: double.tryParse(json['totalPrice'].toString()) ?? 0.0,
-    cropCode: int.tryParse(json['cropCode'].toString()) ?? 0,
-    packagingTypeCode: int.tryParse(json['packagingTypeCode'].toString()) ?? 0,
-  );
+  factory SalesOrderItem.fromJson(Map<String, dynamic> json) {
+
+    return SalesOrderItem(
+      salesOrderCode: json['salesOrderCode'] != null
+          ? int.tryParse(json['salesOrderCode'].toString())
+          : null,
+      salesOrderItemCode: json['salesOrderItemCode'] != null
+          ? int.tryParse(json['salesOrderItemCode'].toString())
+          : null,
+      cropCategoryName: json['cropCategoryName'],
+      cropName: json['cropName'],
+      packagingTypeName: json['packagingTypeName'],
+      unitName: json['unitName'],
+      itemPrice: double.tryParse(json['itemPrice'].toString()) ?? 0.0,
+      quantity: int.tryParse(json['quantity'].toString()) ?? 0,
+      totalPrice: double.tryParse(json['totalPrice'].toString()) ?? 0.0,
+      cropCode: int.tryParse(json['cropCode'].toString()) ?? 0,
+      packagingTypeCode:
+          int.tryParse(json['packagingTypeCode'].toString()) ?? 0,
+    );
+  }
 
   Map<String, dynamic> toJson() => {
     'salesOrderCode': salesOrderCode,
@@ -106,6 +127,7 @@ class SalesOrderItem {
     'cropCategoryName': cropCategoryName,
     'cropName': cropName,
     'packagingTypeName': packagingTypeName,
+    'unitName': unitName,
     'itemPrice': itemPrice,
     'quantity': quantity,
     'totalPrice': totalPrice,
@@ -114,30 +136,42 @@ class SalesOrderItem {
   };
 }
 
-// StockItemForSale (unchanged)
 class StockItemForSale {
   final int cropCode;
   final String cropName;
   final int packagingTypeCode;
   final String packagingTypeName;
+  final String? unitName;
   final int quantityAvailable;
+  final int quantityDamaged; 
   final double? amount;
+  final String? isAvailable;
 
   StockItemForSale({
     required this.cropCode,
     required this.cropName,
     required this.packagingTypeCode,
     required this.packagingTypeName,
+    this.unitName,
     required this.quantityAvailable,
+    this.quantityDamaged = 0, 
     this.amount,
+    this.isAvailable, 
   });
 
-  factory StockItemForSale.fromJson(Map<String, dynamic> json) => StockItemForSale(
+  int get netQuantity => quantityAvailable - quantityDamaged;
+
+  factory StockItemForSale.fromJson(
+    Map<String, dynamic> json,
+  ) => StockItemForSale(
     cropCode: int.tryParse(json['cropCode'].toString()) ?? 0,
     cropName: json['cropName'] ?? '',
     packagingTypeCode: int.tryParse(json['packagingTypeCode'].toString()) ?? 0,
     packagingTypeName: json['packagingTypeName'] ?? '',
+    unitName: json['unitName'],
     quantityAvailable: int.tryParse(json['quantityAvailable'].toString()) ?? 0,
+    quantityDamaged: int.tryParse(json['quantityDamaged']?.toString() ?? '') ?? 0, 
     amount: double.tryParse(json['amount']?.toString() ?? ''),
+    isAvailable: json['isAvailable']?.toString(),
   );
 }

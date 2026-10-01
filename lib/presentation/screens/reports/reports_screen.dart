@@ -20,7 +20,8 @@ class ReportsScreen extends ConsumerStatefulWidget {
 class _ReportsScreenState extends ConsumerState<ReportsScreen> {
   String? _selectedDistrictCode;
   String? _selectedHubCode;
-  DateTime? _startDate;
+  DateTime? _fromDate;
+  DateTime? _toDate;
   bool _isLoading = false;
 
   @override
@@ -36,22 +37,53 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     });
   }
 
-  Future<void> _selectDate(BuildContext context) async {
+  Future<void> _selectFromDate(BuildContext context) async {
     final picked = await showDatePicker(
       context: context,
-      initialDate: _startDate ?? DateTime.now(),
+      initialDate: _fromDate ?? DateTime.now(),
       firstDate: DateTime(2020),
       lastDate: DateTime.now(),
     );
     if (picked != null) {
-      setState(() => _startDate = picked);
+      setState(() => _fromDate = picked);
+      if (_toDate != null && _toDate!.isBefore(picked)) {
+        setState(() => _toDate = null);
+      }
+    }
+  }
+
+  Future<void> _selectToDate(BuildContext context) async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _toDate ?? (_fromDate ?? DateTime.now()),
+      firstDate: _fromDate ?? DateTime(2020),
+      lastDate: DateTime.now(),
+    );
+    if (picked != null) {
+      setState(() => _toDate = picked);
     }
   }
 
   Future<void> _generateSalesReport() async {
-    if (_selectedHubCode == null || _startDate == null) {
+    if (_selectedHubCode == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Please select a hub.')));
+      return;
+    }
+    if (_fromDate == null || _toDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a hub and start date.')),
+        const SnackBar(
+          content: Text('Please select both From Date and To Date.'),
+        ),
+      );
+      return;
+    }
+    if (_fromDate!.isAfter(_toDate!)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('From Date must be before or equal to To Date.'),
+        ),
       );
       return;
     }
@@ -59,22 +91,26 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     final user = ref.read(authStateProvider).value;
     if (user == null) return;
 
-    // Resolve hub name
-    String hubName = '';
-    final hub = user.listHubs.firstWhere(
-      (h) => h['key'] == _selectedHubCode,
-      orElse: () => {'value': 'Hub'},
-    );
-    hubName = hub['value'] ?? 'Hub';
-
     setState(() => _isLoading = true);
 
     try {
+      //Resolve hub name
+      String hubName = '';
+      final hub = user.listHubs.firstWhere(
+        (h) => h['key'] == _selectedHubCode,
+        orElse: () => {'value': 'Hub'},
+      );
+      hubName = hub['value'] ?? 'Hub';
+
+      //Updated query params to match Swagger
       final queryParams = {
         'hubCode': _selectedHubCode!,
-        'hubName': hubName,
-        'entrydate': DateFormat('yyyy-MM-dd').format(_startDate!),
+        'hubName': hubName, //Required by Swagger
+        'fromdate': DateFormat('yyyy-MM-dd').format(_fromDate!), //Lowercase
+        'todate': DateFormat('yyyy-MM-dd').format(_toDate!), // Lowercase
       };
+
+      print('📊 Report query params: $queryParams');
 
       final api = ApiService();
       final response = await api.get(
@@ -82,29 +118,23 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
         queryParameters: queryParams,
       );
 
-      final data = response.data;
+      final data = response.data as Map<String, dynamic>;
 
       // Check for error in response
-      if (data is Map<String, dynamic>) {
-        if (data.containsKey('error') || data.containsKey('message') || data.containsKey('status')) {
-          final errorMsg = data['message'] ?? data['error'] ?? 'Failed to generate report.';
-          throw Exception(errorMsg);
-        }
+      if (data.containsKey('error') || data.containsKey('message')) {
+        final errorMsg =
+            data['message'] ?? data['error'] ?? 'Failed to generate report.';
+        throw Exception(errorMsg);
       }
 
-      final base64 = data['pdfData'];
-      if (base64 == null || base64.isEmpty) {
-        throw Exception('No sales data found for the selected date.');
+      final base64String = data['pdfData'] as String?;
+      if (base64String == null || base64String.isEmpty) {
+        throw Exception('No PDF data in response.');
       }
 
-      final bytes = base64Decode(base64);
+      final bytes = base64Decode(base64String);
       if (bytes.isEmpty) {
         throw Exception('Generated PDF is empty.');
-      }
-
-      const int minFileSize = 3000;
-      if (bytes.length < minFileSize) {
-        throw Exception('No sales data found for the selected date.');
       }
 
       final tempDir = await getTemporaryDirectory();
@@ -116,11 +146,17 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
       await Share.shareXFiles([XFile(file.path)], text: 'Sales Report');
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Sales report generated and shared successfully!')),
+        const SnackBar(
+          content: Text('Sales report generated and shared successfully!'),
+        ),
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: ${e.toString().replaceFirst('Exception: ', '')}')),
+        SnackBar(
+          content: Text(
+            'Error: ${e.toString().replaceFirst('Exception: ', '')}',
+          ),
+        ),
       );
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -141,18 +177,21 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     final showDistrict = role == 'ADMIN' || role == 'STATEUSER';
     final showHub = role != 'HUBUSER';
 
-    // Get hubs – for admin/state we filter by selected district
     List<Map<String, String>> allHubs = user?.listHubs ?? [];
     List<Map<String, String>> filteredHubs = allHubs;
     if (showDistrict && _selectedDistrictCode != null) {
-      filteredHubs = allHubs.where((h) => h['value1'] == _selectedDistrictCode).toList();
+      filteredHubs = allHubs
+          .where((h) => h['value1'] == _selectedDistrictCode)
+          .toList();
     }
 
     return Scaffold(
       appBar: AppBar(
         title: Text(
           'Sales Report',
-          style: TextStyle(fontSize: Responsive.getResponsiveFontSize(context, baseSize: 18)),
+          style: TextStyle(
+            fontSize: Responsive.getResponsiveFontSize(context, baseSize: 18),
+          ),
         ),
       ),
       body: SingleChildScrollView(
@@ -160,21 +199,25 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // District dropdown (admin/state only)
             if (showDistrict)
               DropdownButtonFormField<String>(
                 value: _selectedDistrictCode,
-                hint: Text('Select District', style: TextStyle(fontSize: fontSize)),
-                items: user?.listDistricts.map((d) {
-                  return DropdownMenuItem(
-                    value: d['key'],
-                    child: Text(
-                      d['value'] ?? '',
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: fontSize),
-                    ),
-                  );
-                }).toList() ?? [],
+                hint: Text(
+                  'Select District',
+                  style: TextStyle(fontSize: fontSize),
+                ),
+                items:
+                    user?.listDistricts.map((d) {
+                      return DropdownMenuItem(
+                        value: d['key'],
+                        child: Text(
+                          d['value'] ?? '',
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: fontSize),
+                        ),
+                      );
+                    }).toList() ??
+                    [],
                 onChanged: (val) {
                   setState(() {
                     _selectedDistrictCode = val;
@@ -193,7 +236,6 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
               ),
             if (showDistrict) SizedBox(height: spacing),
 
-            // Hub dropdown (all users except hubuser) – filtered by district
             if (showHub)
               DropdownButtonFormField<String>(
                 value: _selectedHubCode,
@@ -221,12 +263,12 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
               ),
             if (showHub) SizedBox(height: spacing),
 
-            // Start Date picker
+            // From Date
             InkWell(
-              onTap: () => _selectDate(context),
+              onTap: () => _selectFromDate(context),
               child: InputDecorator(
                 decoration: InputDecoration(
-                  labelText: 'Start Date',
+                  labelText: 'From Date',
                   labelStyle: TextStyle(fontSize: fontSize),
                   border: const OutlineInputBorder(),
                   contentPadding: EdgeInsets.symmetric(
@@ -235,9 +277,32 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                   ),
                 ),
                 child: Text(
-                  _startDate == null
-                      ? 'Select Date'
-                      : DateFormat('dd/MM/yyyy').format(_startDate!),
+                  _fromDate == null
+                      ? 'Select From Date'
+                      : DateFormat('dd/MM/yyyy').format(_fromDate!),
+                  style: TextStyle(fontSize: fontSize),
+                ),
+              ),
+            ),
+            SizedBox(height: spacing),
+
+            // To Date
+            InkWell(
+              onTap: () => _selectToDate(context),
+              child: InputDecorator(
+                decoration: InputDecoration(
+                  labelText: 'To Date',
+                  labelStyle: TextStyle(fontSize: fontSize),
+                  border: const OutlineInputBorder(),
+                  contentPadding: EdgeInsets.symmetric(
+                    vertical: isVerySmall ? 8 : 14,
+                    horizontal: 12,
+                  ),
+                ),
+                child: Text(
+                  _toDate == null
+                      ? 'Select To Date'
+                      : DateFormat('dd/MM/yyyy').format(_toDate!),
                   style: TextStyle(fontSize: fontSize),
                 ),
               ),
@@ -251,12 +316,20 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                   ? SizedBox(
                       height: 20,
                       width: 20,
-                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
                     )
                   : const Icon(Icons.preview),
               label: Text(
                 _isLoading ? 'Generating...' : 'Generate Sales Report',
-                style: TextStyle(fontSize: Responsive.getResponsiveFontSize(context, baseSize: 16)),
+                style: TextStyle(
+                  fontSize: Responsive.getResponsiveFontSize(
+                    context,
+                    baseSize: 16,
+                  ),
+                ),
               ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.green[700],

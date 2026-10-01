@@ -42,15 +42,24 @@ class RateInfo {
   final String cropCode;
   final String packagingTypeCode;
   final String unitCode;
+  final String? quantity;          
+  final String? unitName;          
+  final String? packagingTypeName;  
   RateInfo({
     required this.cropCode,
     required this.packagingTypeCode,
     required this.unitCode,
+    this.quantity,
+    this.unitName,
+    this.packagingTypeName,
   });
   factory RateInfo.fromJson(Map<String, dynamic> json) => RateInfo(
     cropCode: json['cropCode']?.toString() ?? '',
     packagingTypeCode: json['packagingTypeCode']?.toString() ?? '',
     unitCode: json['unitCode']?.toString() ?? '',
+     quantity: json['quantity']?.toString(),
+    unitName: json['unitName'],
+    packagingTypeName: json['packagingTypeName'],
   );
 }
 

@@ -98,7 +98,7 @@ class _HubDetailScreenState extends ConsumerState<HubDetailScreen> {
               const SizedBox(height: 12),
               Expanded(
                 child: ratesAsync.when(
-                  loading: () => const Center(child: CircularProgressIndicator()),
+                  loading: () => const Center(child: CircularProgressIndicator(color: Color(0xFF388E3C))),
                   error: (err, _) => Center(child: Text('Error: $err')),
                   data: (rates) {
                     final uniqueCrops = rates

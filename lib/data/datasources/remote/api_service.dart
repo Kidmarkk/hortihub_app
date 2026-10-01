@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:dio/dio.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../../core/constants/api_constants.dart';
 import '../../../core/utils/auth_utils.dart';
@@ -122,8 +123,8 @@ class ApiService {
       headers: headers,
       body: jsonEncode(body),
     );
-    print('📥 Native response status: ${response.statusCode}');
-    print('📥 Native response body: ${response.body}');
+    debugPrint('📥 Native response status: ${response.statusCode}');
+    debugPrint('📥 Native response body: ${response.body}');
 
     dynamic data;
     try {
@@ -271,6 +272,52 @@ class ApiService {
       statusCode: response.statusCode,
       requestOptions: RequestOptions(path: path),
     );
+  }
+
+  Future<Response> postMultipartFormData(
+    String path,
+    Map<String, dynamic> data,
+  ) async {
+    final authKey = AuthUtils.generateAuthKey();
+    final token = await _getToken();
+
+    final headers = <String, String>{
+      'authKey': authKey,
+      'accept': 'application/json',
+    };
+    if (token != null && token.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $token';
+    }
+
+    final formData = FormData();
+    data.forEach((key, value) {
+      if (value == null) return;
+      if (value is List) {
+        for (var v in value) {
+          formData.fields.add(MapEntry(key, v.toString()));
+        }
+      } else {
+        formData.fields.add(MapEntry(key, value.toString()));
+      }
+    });
+
+    print('📤 POST Multipart URL: ${_dio.options.baseUrl}$path');
+    print('📤 POST Multipart Data: $data');
+    print('📤 POST Multipart Headers: $headers');
+
+    final response = await _dio.post(
+      path,
+      data: formData,
+      options: Options(
+        headers: headers,
+        responseType: ResponseType.plain, // ← THE KEY FIX
+      ),
+    );
+
+    print('📥 Multipart response status: ${response.statusCode}');
+    print('📥 Multipart response body: ${response.data}');
+
+    return response;
   }
 
   Future<Response> get(

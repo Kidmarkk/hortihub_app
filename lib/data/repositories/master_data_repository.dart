@@ -10,22 +10,37 @@ class MasterDataRepository {
       '${ApiConstants.ratesList}$hubCode',
     );
     final data = response.data;
-    final rates = (data['listDetails'] as List?)
-        ?.map((e) => RateInfo.fromJson(e))
-        .toList() ?? [];
+
+    // ✅ TEMPORARY DEBUG PRINT
+    final rawRates = data['listDetails'] as List?;
+    if (rawRates != null && rawRates.isNotEmpty) {
+      print('📋 RAW RATE (first item): ${rawRates.first}');
+    } else {
+      print('📋 No rates returned');
+    }
+
+    final rates =
+        (data['listDetails'] as List?)
+            ?.map((e) => RateInfo.fromJson(e))
+            .toList() ??
+        [];
     return MasterData(
-      cropCategories: (data['listCropCategory'] as List?)
-          ?.map((e) => CropCategory.fromJson(e))
-          .toList() ?? [],
-      crops: (data['listCrops'] as List?)
-          ?.map((e) => Crop.fromJson(e))
-          .toList() ?? [],
-      packagingTypes: (data['listPackagingTypes'] as List?)
-          ?.map((e) => PackagingType.fromJson(e))
-          .toList() ?? [],
-      units: (data['listUnits'] as List?)
-          ?.map((e) => Unit.fromJson(e))
-          .toList() ?? [],
+      cropCategories:
+          (data['listCropCategory'] as List?)
+              ?.map((e) => CropCategory.fromJson(e))
+              .toList() ??
+          [],
+      crops:
+          (data['listCrops'] as List?)?.map((e) => Crop.fromJson(e)).toList() ??
+          [],
+      packagingTypes:
+          (data['listPackagingTypes'] as List?)
+              ?.map((e) => PackagingType.fromJson(e))
+              .toList() ??
+          [],
+      units:
+          (data['listUnits'] as List?)?.map((e) => Unit.fromJson(e)).toList() ??
+          [],
       rates: rates,
     );
   }

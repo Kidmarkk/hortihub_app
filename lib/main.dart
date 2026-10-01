@@ -41,7 +41,9 @@ class HortiHubApp extends StatelessWidget {
           labelStyle: const TextStyle(
             color: Colors.grey,
           ), // default label color
-          floatingLabelStyle: const TextStyle(color: Color.fromARGB(255, 18, 90, 21)),
+          floatingLabelStyle: const TextStyle(
+            color: Color.fromARGB(255, 18, 90, 21),
+          ),
         ),
         textSelectionTheme: const TextSelectionThemeData(
           cursorColor: Colors.green,

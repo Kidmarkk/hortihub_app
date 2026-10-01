@@ -14,7 +14,8 @@ class ProductionListScreen extends ConsumerStatefulWidget {
   const ProductionListScreen({super.key, this.hubCode});
 
   @override
-  ConsumerState<ProductionListScreen> createState() => _ProductionListScreenState();
+  ConsumerState<ProductionListScreen> createState() =>
+      _ProductionListScreenState();
 }
 
 class _ProductionListScreenState extends ConsumerState<ProductionListScreen> {
@@ -33,14 +34,23 @@ class _ProductionListScreenState extends ConsumerState<ProductionListScreen> {
               _detailRow('Expected Yield', item.expectedYield ?? 'N/A'),
               _detailRow('Actual Yield', item.actualYield ?? 'N/A'),
               _detailRow('Season', item.season ?? 'N/A'),
-              _detailRow('Financial Year', item.finyearName ?? item.finyearCode ?? 'N/A'),
+              _detailRow(
+                'Financial Year',
+                item.finyearName ?? item.finyearCode ?? 'N/A',
+              ),
               _detailRow('Hub Name', item.hubName ?? 'N/A'),
               _detailRow('District', item.districtName ?? 'N/A'),
             ],
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.red,
+            ),
+            child: const Text('Close'),
+          ),
         ],
       ),
     );
@@ -53,7 +63,10 @@ class _ProductionListScreenState extends ConsumerState<ProductionListScreen> {
         text: TextSpan(
           style: const TextStyle(color: Colors.black87),
           children: [
-            TextSpan(text: '$label: ', style: const TextStyle(fontWeight: FontWeight.bold)),
+            TextSpan(
+              text: '$label: ',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
             TextSpan(text: value),
           ],
         ),
@@ -74,11 +87,13 @@ class _ProductionListScreenState extends ConsumerState<ProductionListScreen> {
       horizontal: Responsive.getResponsivePadding(context, basePadding: 4),
     );
 
-    if (user?.userRole == 'HUBUSER' && selectedHub == null && user?.hubCode != null) {
+    if (user?.userRole == 'HUBUSER' &&
+        selectedHub == null &&
+        user?.hubCode != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         ref.read(selectedHubProvider.notifier).state = user?.hubCode;
       });
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(body: Center(child: CircularProgressIndicator(color: Color(0xFF388E3C))));
     }
 
     return Scaffold(
@@ -88,8 +103,16 @@ class _ProductionListScreenState extends ConsumerState<ProductionListScreen> {
           const HubSelectionWidget(),
           IconHelper(
             items: [
-              IconHelperItem(icon: Icons.remove_red_eye, label: 'View Details', color: Colors.blue),
-              IconHelperItem(icon: Icons.edit, label: 'Edit Details', color: Colors.green),
+              IconHelperItem(
+                icon: Icons.remove_red_eye,
+                label: 'View Details',
+                color: Colors.blue,
+              ),
+              IconHelperItem(
+                icon: Icons.edit,
+                label: 'Edit Details',
+                color: Colors.green,
+              ),
             ],
           ),
           Expanded(
@@ -102,7 +125,10 @@ class _ProductionListScreenState extends ConsumerState<ProductionListScreen> {
                         const SizedBox(height: 8),
                         Text(
                           'Select a district and hub to view production data',
-                          style: TextStyle(color: Colors.grey, fontSize: fontSize),
+                          style: TextStyle(
+                            color: Colors.grey,
+                            fontSize: fontSize,
+                          ),
                           textAlign: TextAlign.center,
                         ),
                       ],
@@ -110,12 +136,25 @@ class _ProductionListScreenState extends ConsumerState<ProductionListScreen> {
                   )
                 : Consumer(
                     builder: (ctx, ref, _) {
-                      final productionAsync = ref.watch(productionListProvider(selectedHub!));
+                      final productionAsync = ref.watch(
+                        productionListProvider(selectedHub!),
+                      );
                       return productionAsync.when(
-                        loading: () => const Center(child: CircularProgressIndicator()),
-                        error: (err, _) => Center(child: Text('Error: $err', style: TextStyle(fontSize: fontSize))),
+                        loading: () =>
+                            const Center(child: CircularProgressIndicator(color: Color(0xFF388E3C))),
+                        error: (err, _) => Center(
+                          child: Text(
+                            'Error: $err',
+                            style: TextStyle(fontSize: fontSize),
+                          ),
+                        ),
                         data: (items) => items.isEmpty
-                            ? Center(child: Text('No production records', style: TextStyle(fontSize: fontSize)))
+                            ? Center(
+                                child: Text(
+                                  'No production records',
+                                  style: TextStyle(fontSize: fontSize),
+                                ),
+                              )
                             : ListView.builder(
                                 padding: EdgeInsets.all(padding),
                                 itemCount: items.length,
@@ -134,13 +173,17 @@ class _ProductionListScreenState extends ConsumerState<ProductionListScreen> {
                                       ),
                                       subtitle: Text(
                                         'Season: ${item.season} | Expected: ${item.expectedYield} | Actual: ${item.actualYield}',
-                                        style: TextStyle(fontSize: fontSize * 0.85),
+                                        style: TextStyle(
+                                          fontSize: fontSize * 0.85,
+                                        ),
                                       ),
                                       trailing: Row(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
                                           IconButton(
-                                            icon: const Icon(Icons.remove_red_eye),
+                                            icon: const Icon(
+                                              Icons.remove_red_eye,
+                                            ),
                                             color: Colors.blue[700],
                                             iconSize: iconSize,
                                             padding: EdgeInsets.zero,
@@ -158,10 +201,11 @@ class _ProductionListScreenState extends ConsumerState<ProductionListScreen> {
                                               Navigator.push(
                                                 context,
                                                 MaterialPageRoute(
-                                                  builder: (_) => AddEditProductionScreen(
-                                                    hubCode: selectedHub!,
-                                                    production: item,
-                                                  ),
+                                                  builder: (_) =>
+                                                      AddEditProductionScreen(
+                                                        hubCode: selectedHub!,
+                                                        production: item,
+                                                      ),
                                                 ),
                                               );
                                             },
@@ -184,10 +228,15 @@ class _ProductionListScreenState extends ConsumerState<ProductionListScreen> {
               onPressed: () => Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => AddEditProductionScreen(hubCode: selectedHub!),
+                  builder: (_) =>
+                      AddEditProductionScreen(hubCode: selectedHub!),
                 ),
               ),
-              child: Icon(Icons.add, color: Colors.white, size: isVerySmall ? 20 : 24),
+              child: Icon(
+                Icons.add,
+                color: Colors.white,
+                size: isVerySmall ? 20 : 24,
+              ),
             )
           : null,
     );

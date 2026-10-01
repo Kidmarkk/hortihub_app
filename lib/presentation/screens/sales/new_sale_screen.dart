@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hortihub_new_app/core/utils/responsive.dart';
+import 'package:hortihub_new_app/data/models/dropdown_models.dart';
+import 'package:hortihub_new_app/data/models/rate_models.dart';
 import 'package:hortihub_new_app/presentation/providers/master_data_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:hortihub_new_app/services/thermal_printer_service.dart';
@@ -51,10 +53,12 @@ class NewSaleScreen extends ConsumerStatefulWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
             child: const Text('No'),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.green[700]),
             child: const Text('Yes'),
           ),
         ],
@@ -69,16 +73,16 @@ class NewSaleScreen extends ConsumerStatefulWidget {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => const Center(
+      builder: (ctx) => Center(
         child: Card(
           child: Padding(
-            padding: EdgeInsets.all(20.0),
+            padding: const EdgeInsets.all(20.0),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                CircularProgressIndicator(),
-                SizedBox(height: 16),
-                Text("Printing receipt..."),
+                CircularProgressIndicator(color: Colors.green[700]),
+                const SizedBox(height: 16),
+                const Text("Printing receipt..."),
               ],
             ),
           ),
@@ -135,15 +139,16 @@ class NewSaleScreen extends ConsumerStatefulWidget {
         'buyerName': sale.buyerName,
         'date': DateTime.now().toString().split(' ')[0],
         'total': (sale.totalPrice ?? 0.0).toStringAsFixed(2),
-        'items': sale.items
-            .map(
-              (item) => {
-                'name': '${item.cropName} (${item.packagingTypeName})',
-                'qty': item.quantity,
-                'price': (item.totalPrice ?? 0.0).toStringAsFixed(2),
-              },
-            )
-            .toList(),
+        'items': sale.items.map((item) {
+          print('🔍 ${item.cropName}: unitName = ${item.unitName}');
+
+          return {
+            'name': '${item.cropName} (${item.packagingTypeName})',
+            'qty': item.quantity,
+            'unit': item.unitName ?? '',
+            'price': (item.totalPrice ?? 0.0).toStringAsFixed(2),
+          };
+        }).toList(),
       };
 
       debugPrint('Order Data: $orderData');
@@ -276,6 +281,15 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
     }
   }
 
+  String? _validateMobile(String? value) {
+    if (value == null || value.isEmpty) return 'Mobile number is required';
+    if (value.length != 10) return 'Must be exactly 10 digits';
+    if (!RegExp(r'^[0-9]{10}$').hasMatch(value)) {
+      return 'Only digits allowed';
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     final isVerySmall = Responsive.isVerySmallScreen(context);
@@ -351,6 +365,7 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
               ),
               keyboardType: TextInputType.phone,
               style: TextStyle(fontSize: fontSize),
+              validator: _validateMobile,
             ),
             SizedBox(height: spacing * 2),
             Row(
@@ -453,6 +468,7 @@ class _AddItemDialogState extends ConsumerState<AddItemDialog> {
   String? _selectedCropName;
   String? _selectedPackagingCode;
   String? _selectedPackagingName;
+  String? _selectedUnitName;
   int? _selectedQuantity;
   double? _selectedPrice;
 
@@ -475,7 +491,7 @@ class _AddItemDialogState extends ConsumerState<AddItemDialog> {
       content: masterDataAsync.when(
         loading: () => const SizedBox(
           height: 200,
-          child: Center(child: CircularProgressIndicator()),
+          child: Center(child: CircularProgressIndicator(color: Color(0xFF388E3C))),
         ),
         error: (err, _) => Text(
           'Error loading master data: $err',
@@ -485,7 +501,7 @@ class _AddItemDialogState extends ConsumerState<AddItemDialog> {
           return stockAsync.when(
             loading: () => const SizedBox(
               height: 200,
-              child: Center(child: CircularProgressIndicator()),
+              child: Center(child: CircularProgressIndicator(color: Color(0xFF388E3C))),
             ),
             error: (err, _) => Text(
               'Error loading stock: $err',
@@ -612,7 +628,7 @@ class _AddItemDialogState extends ConsumerState<AddItemDialog> {
                     )
                     .fold(0, (sum, item) => sum + item.quantity);
 
-                maxQty = stockItem.quantityAvailable - usedQty;
+                maxQty = stockItem.netQuantity - usedQty;
                 if (maxQty < 0) maxQty = 0;
               }
 
@@ -660,6 +676,7 @@ class _AddItemDialogState extends ConsumerState<AddItemDialog> {
                           _selectedCropName = null;
                           _selectedPackagingCode = null;
                           _selectedPackagingName = null;
+                          _selectedUnitName = null;
                           _selectedQuantity = null;
                           _selectedPrice = null;
                         });
@@ -703,6 +720,7 @@ class _AddItemDialogState extends ConsumerState<AddItemDialog> {
                                     .name;
                                 _selectedPackagingCode = null;
                                 _selectedPackagingName = null;
+                                _selectedUnitName = null;
                                 _selectedQuantity = null;
                                 _selectedPrice = null;
                               });
@@ -728,27 +746,46 @@ class _AddItemDialogState extends ConsumerState<AddItemDialog> {
                               'Select Packaging',
                               style: TextStyle(fontSize: fontSize),
                             ),
-                            items: packagingOptions
-                                .map(
-                                  (p) => DropdownMenuItem(
-                                    value: p.packagingTypeCode.toString(),
-                                    child: Text(
-                                      p.packagingTypeName,
-                                      style: TextStyle(fontSize: fontSize),
-                                    ),
-                                  ),
-                                )
-                                .toList(),
+                            items: packagingOptions.map((p) {
+                              // Find rate for this crop+packaging
+                              RateInfo? rate;
+                              for (final r in masterData.rates) {
+                                if (r.cropCode == _selectedCropCode &&
+                                    r.packagingTypeCode ==
+                                        p.packagingTypeCode.toString()) {
+                                  rate = r;
+                                  break;
+                                }
+                              }
+
+                              String displayName = p.packagingTypeName;
+                              if (rate?.quantity != null &&
+                                  rate!.quantity!.isNotEmpty &&
+                                  rate.unitName != null &&
+                                  rate.unitName!.isNotEmpty) {
+                                final qty =
+                                    double.tryParse(rate.quantity!) ?? 0.0;
+                                displayName =
+                                    '${p.packagingTypeName} (${qty.toStringAsFixed(2)} ${rate.unitName})';
+                              }
+
+                              return DropdownMenuItem(
+                                value: p.packagingTypeCode.toString(),
+                                child: Text(displayName),
+                              );
+                            }).toList(),
                             onChanged: (code) {
                               setState(() {
                                 _selectedPackagingCode = code;
-                                _selectedPackagingName = packagingOptions
+                                final selectedStock = packagingOptions
                                     .firstWhere(
                                       (p) =>
                                           p.packagingTypeCode.toString() ==
                                           code,
-                                    )
-                                    .packagingTypeName;
+                                    );
+                                _selectedPackagingName =
+                                    selectedStock.packagingTypeName;
+                                _selectedUnitName = selectedStock.unitName;
                                 _selectedQuantity = null;
                                 _selectedPrice = null;
                               });
@@ -869,15 +906,52 @@ class _AddItemDialogState extends ConsumerState<AddItemDialog> {
                     );
                     return;
                   }
+
+                  final masterDataValue = ref
+                      .read(masterDataProvider(widget.hubCode))
+                      .value;
+                  final rates = masterDataValue?.rates ?? [];
+
+                  RateInfo? matchingRate;
+                  for (final r in rates) {
+                    if (r.cropCode == _selectedCropCode &&
+                        r.packagingTypeCode == _selectedPackagingCode) {
+                      matchingRate = r;
+                      break;
+                    }
+                  }
+
+                  String combinedPackagingName = _selectedPackagingName ?? '';
+
+                  if (matchingRate != null &&
+                      matchingRate.quantity != null &&
+                      matchingRate.quantity!.isNotEmpty &&
+                      matchingRate.unitName != null &&
+                      matchingRate.unitName!.isNotEmpty) {
+                    final rateQty =
+                        double.tryParse(matchingRate.quantity!) ?? 0.0;
+                    combinedPackagingName =
+                        '${_selectedPackagingName ?? ''} '
+                        '(${rateQty.toStringAsFixed(2)} ${matchingRate.unitName})';
+                  } else if (_selectedUnitName != null &&
+                      _selectedUnitName!.isNotEmpty) {
+                    // Fallback: use selected unit without quantity
+                    combinedPackagingName =
+                        '${_selectedPackagingName ?? ''} ($_selectedUnitName)';
+                  }
+
                   final qty = _selectedQuantity!;
                   final price = _selectedPrice!;
                   final total = qty * price;
+
                   final item = SalesOrderItem(
                     cropCode: int.tryParse(_selectedCropCode!) ?? 0,
                     packagingTypeCode:
                         int.tryParse(_selectedPackagingCode!) ?? 0,
                     cropName: _selectedCropName ?? '',
-                    packagingTypeName: _selectedPackagingName ?? '',
+                    packagingTypeName:
+                        combinedPackagingName, // "MINI (0.50 KILOGRAM)"
+                    unitName: matchingRate?.unitName ?? _selectedUnitName,
                     quantity: qty,
                     itemPrice: price,
                     totalPrice: total,

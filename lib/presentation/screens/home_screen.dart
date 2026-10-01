@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hortihub_new_app/core/utils/responsive.dart';
@@ -8,22 +9,88 @@ import '../../data/models/hub_model.dart';
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
+  //Helper: Build hub image from Base64 or fallback
+  Widget _buildHubImage(Hub hub, double imageHeight) {
+    // 1. Check if hub has Base64 image data
+    if (hub.imageBase64 != null && hub.imageBase64!.isNotEmpty) {
+      try {
+        String base64String = hub.imageBase64!;
+        // Remove data:image/jpeg;base64, prefix if present
+        if (base64String.contains(',')) {
+          base64String = base64String.split(',').last;
+        }
+
+        final bytes = base64Decode(base64String);
+
+        return Image.memory(
+          bytes,
+          height: imageHeight,
+          width: double.infinity,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => _buildFallbackImage(hub, imageHeight),
+        );
+      } catch (e) {
+        // If decoding fails, use fallback
+        return _buildFallbackImage(hub, imageHeight);
+      }
+    }
+
+    // 2. Fallback to local assets
+    return _buildFallbackImage(hub, imageHeight);
+  }
+
+  //Helper: Build fallback image from local assets
+  Widget _buildFallbackImage(Hub hub, double imageHeight) {
+    final imageBase = 'assets/images/';
+
+    String imagePath;
+    if (hub.code == '1') {
+      imagePath = '${imageBase}hub1.webp';
+    } else {
+      // Default fallback
+      imagePath = '${imageBase}bg.webp';
+    }
+
+    return Image.asset(
+      imagePath,
+      height: imageHeight,
+      width: double.infinity,
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) =>
+          const Icon(Icons.image_not_supported, size: 50),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authStateProvider).value;
     final role = user?.userRole ?? 'GUEST';
     final userName = user?.userName ?? 'User';
 
-    final screenWidth = MediaQuery.of(context).size.width;
     final isVerySmall = Responsive.isVerySmallScreen(context);
     final crossAxisCount = Responsive.getGridColumns(context);
 
     // Responsive font sizes using the utility
-    final double titleFontSize = Responsive.getResponsiveFontSize(context, baseSize: 22);
-    final double subTitleFontSize = Responsive.getResponsiveFontSize(context, baseSize: 14);
-    final double cardTitleSize = Responsive.getResponsiveFontSize(context, baseSize: 14);
-    final double cardSubSize = Responsive.getResponsiveFontSize(context, baseSize: 12);
-    final double welcomeTextSize = Responsive.getResponsiveFontSize(context, baseSize: 13);
+    final double titleFontSize = Responsive.getResponsiveFontSize(
+      context,
+      baseSize: 22,
+    );
+    final double subTitleFontSize = Responsive.getResponsiveFontSize(
+      context,
+      baseSize: 14,
+    );
+    final double cardTitleSize = Responsive.getResponsiveFontSize(
+      context,
+      baseSize: 14,
+    );
+    final double cardSubSize = Responsive.getResponsiveFontSize(
+      context,
+      baseSize: 12,
+    );
+    final double welcomeTextSize = Responsive.getResponsiveFontSize(
+      context,
+      baseSize: 13,
+    );
     final double imageHeight = isVerySmall ? 60 : 90;
     final double spacing = isVerySmall ? 6 : 12;
 
@@ -41,6 +108,7 @@ class HomeScreen extends ConsumerWidget {
       return match['value'] ?? districtCode;
     }
 
+    //build hubs list with imageBase64
     List<Hub> hubs = [];
     if (user != null) {
       if (user.listHubs.isNotEmpty) {
@@ -49,11 +117,14 @@ class HomeScreen extends ConsumerWidget {
           final hubName = map['value'] ?? '';
           final districtCode = map['value1'] ?? '';
           final districtName = _resolveDistrictName(districtCode);
+          final imageBase64 = map['imageBase64'] ?? '';
+
           return Hub(
             code: hubCode,
             name: hubName,
             districtCode: districtCode,
             districtName: districtName,
+            imageBase64: imageBase64.isNotEmpty ? imageBase64 : null,
           );
         }).toList();
       } else if (user.hubCode != null) {
@@ -67,14 +138,15 @@ class HomeScreen extends ConsumerWidget {
             name: user.hubName ?? 'Hub ${user.hubCode}',
             districtCode: user.districtCode ?? '',
             districtName: districtName,
-          )
+            imageBase64:
+                null, // Hub users don't get image data from userDetails
+          ),
         ];
       }
     }
 
     final imageBase = 'assets/images/';
     final fallbackImages = ['bg.webp', 'hortihub.webp'];
-    final customImageForHub1 = '${imageBase}hub1.webp';
 
     return SingleChildScrollView(
       padding: EdgeInsets.all(Responsive.getResponsivePadding(context)),
@@ -85,8 +157,14 @@ class HomeScreen extends ConsumerWidget {
           Container(
             width: double.infinity,
             padding: EdgeInsets.symmetric(
-              vertical: Responsive.getResponsivePadding(context, basePadding: 12),
-              horizontal: Responsive.getResponsivePadding(context, basePadding: 16),
+              vertical: Responsive.getResponsivePadding(
+                context,
+                basePadding: 12,
+              ),
+              horizontal: Responsive.getResponsivePadding(
+                context,
+                basePadding: 16,
+              ),
             ),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
@@ -146,10 +224,7 @@ class HomeScreen extends ConsumerWidget {
           const SizedBox(height: 4),
           Text(
             'Select a Horti Hub to view details.',
-            style: TextStyle(
-              fontSize: subTitleFontSize,
-              color: Colors.black54,
-            ),
+            style: TextStyle(fontSize: subTitleFontSize, color: Colors.black54),
           ),
           const SizedBox(height: 16),
 
@@ -172,13 +247,18 @@ class HomeScreen extends ConsumerWidget {
               children: hubs.asMap().entries.map((entry) {
                 final index = entry.key;
                 final hub = entry.value;
-                String imagePath;
+
+                //Fallback image based on index
+                String fallbackImagePath;
                 if (hub.code == '1') {
-                  imagePath = customImageForHub1;
+                  fallbackImagePath = '${imageBase}hub1.webp';
                 } else {
-                  final imageName = index % 2 == 0 ? fallbackImages[0] : fallbackImages[1];
-                  imagePath = '$imageBase$imageName';
+                  final imageName = index % 2 == 0
+                      ? fallbackImages[0]
+                      : fallbackImages[1];
+                  fallbackImagePath = '$imageBase$imageName';
                 }
+
                 return InkWell(
                   borderRadius: BorderRadius.circular(14),
                   onTap: () {
@@ -208,13 +288,10 @@ class HomeScreen extends ConsumerWidget {
                           borderRadius: const BorderRadius.vertical(
                             top: Radius.circular(14),
                           ),
-                          child: Image.asset(
-                            imagePath,
-                            height: imageHeight,
-                            width: double.infinity,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) =>
-                                const Icon(Icons.image_not_supported, size: 50),
+                          child: _buildHubImageWithFallback(
+                            hub,
+                            imageHeight,
+                            fallbackImagePath,
                           ),
                         ),
                         Padding(
@@ -253,6 +330,65 @@ class HomeScreen extends ConsumerWidget {
           const SizedBox(height: 24),
         ],
       ),
+    );
+  }
+
+  //Helper: Build hub image with fallback
+  Widget _buildHubImageWithFallback(
+    Hub hub,
+    double imageHeight,
+    String fallbackImagePath,
+  ) {
+    // 1. Check if hub has Base64 image data
+    if (hub.imageBase64 != null && hub.imageBase64!.isNotEmpty) {
+      try {
+        String base64String = hub.imageBase64!;
+
+        // Remove data:image/*;base64, prefix
+        final regex = RegExp(r'^data:image\/[a-zA-Z]+;base64,');
+        if (regex.hasMatch(base64String)) {
+          base64String = base64String.replaceFirst(regex, '');
+        }
+
+        // If there's still a comma, split and take the last part
+        if (base64String.contains(',')) {
+          base64String = base64String.split(',').last;
+        }
+
+        // Remove ALL whitespace (newlines, spaces, tabs, carriage returns)
+        base64String = base64String.replaceAll(RegExp(r'\s+'), '');
+
+        final bytes = base64Decode(base64String);
+
+        return Image.memory(
+          bytes,
+          height: imageHeight,
+          width: double.infinity,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => Image.asset(
+            fallbackImagePath,
+            height: imageHeight,
+            width: double.infinity,
+            fit: BoxFit.cover,
+          ),
+        );
+      } catch (e) {
+        // If decoding fails, use fallback
+        return Image.asset(
+          fallbackImagePath,
+          height: imageHeight,
+          width: double.infinity,
+          fit: BoxFit.cover,
+        );
+      }
+    }
+
+    // 2. Fallback to local assets
+    return Image.asset(
+      fallbackImagePath,
+      height: imageHeight,
+      width: double.infinity,
+      fit: BoxFit.cover,
     );
   }
 }

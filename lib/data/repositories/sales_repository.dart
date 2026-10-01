@@ -21,14 +21,27 @@ class SalesRepository {
     return list.map((json) => SalesOrder.fromJson(json)).toList();
   }
 
-  // Fetch stock items for a hub (to populate the "add sale" dropdowns)
   Future<List<StockItemForSale>> getStockForSale(String hubCode) async {
-    final response = await _api.postWithoutBodyNative(
-      '${ApiConstants.salesList}$hubCode',
-    );
-    final list = response.data['listDetailsForStock'] as List;
-    return list.map((json) => StockItemForSale.fromJson(json)).toList();
-  }
+  final response = await _api.postWithoutBodyNative(
+    '${ApiConstants.stockList}$hubCode',
+  );
+
+  final listDetails = response.data['listDetails'];
+
+  final list = listDetails as List? ?? [];
+
+  final parsed = list.map((json) => StockItemForSale.fromJson(json)).toList();
+
+  final filtered = parsed
+      .where((item) {
+      final avail = item.isAvailable?.trim().toLowerCase();
+      final isMarkedAvailable = avail == 'yes' || avail == 'y';
+      return isMarkedAvailable && item.netQuantity > 0;
+    })
+    .toList();
+
+  return filtered;
+}
 
   // Add new sale order
   Future<void> addSaleOrder(SalesOrder order) async {

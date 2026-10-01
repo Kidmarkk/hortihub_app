@@ -31,7 +31,10 @@ class _RateListScreenState extends ConsumerState<RateListScreen> {
               _detailRow('Crop Category', rate.cropCategoryName ?? 'N/A'),
               _detailRow('Packaging Type', rate.packagingTypeName ?? 'N/A'),
               _detailRow('Quantity In Packaging', rate.quantity ?? 'N/A'),
-              _detailRow('Price', rate.amount != null ? '₹${rate.amount}' : 'N/A'),
+              _detailRow(
+                'Price',
+                rate.amount != null ? '₹${rate.amount}' : 'N/A',
+              ),
               _detailRow('Applied From', rate.appliesFrom ?? 'N/A'),
               _detailRow('Hub Name', rate.hubName ?? 'N/A'),
               _detailRow('District', rate.districtName ?? 'N/A'),
@@ -41,6 +44,9 @@ class _RateListScreenState extends ConsumerState<RateListScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.red,
+            ),
             child: const Text('Close'),
           ),
         ],
@@ -76,17 +82,25 @@ class _RateListScreenState extends ConsumerState<RateListScreen> {
     final isSmall = Responsive.isSmallScreen(context);
 
     // Responsive font sizes
-    final double titleSize = Responsive.getResponsiveFontSize(context, baseSize: 16);
-    final double subtitleSize = Responsive.getResponsiveFontSize(context, baseSize: 14);
+    final double titleSize = Responsive.getResponsiveFontSize(
+      context,
+      baseSize: 16,
+    );
+    final double subtitleSize = Responsive.getResponsiveFontSize(
+      context,
+      baseSize: 14,
+    );
     final double iconSize = isVerySmall ? 18 : 24;
     final double iconSpacing = isVerySmall ? 4 : 8;
 
     // For hubuser, auto-set the hub if not set
-    if (user?.userRole == 'HUBUSER' && selectedHub == null && user?.hubCode != null) {
+    if (user?.userRole == 'HUBUSER' &&
+        selectedHub == null &&
+        user?.hubCode != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         ref.read(selectedHubProvider.notifier).state = user?.hubCode;
       });
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(body: Center(child: CircularProgressIndicator(color: Color(0xFF388E3C))));
     }
 
     return Scaffold(
@@ -126,14 +140,19 @@ class _RateListScreenState extends ConsumerState<RateListScreen> {
                   )
                 : Consumer(
                     builder: (ctx, ref, _) {
-                      final ratesAsync = ref.watch(ratesListProvider(selectedHub!));
+                      final ratesAsync = ref.watch(
+                        ratesListProvider(selectedHub!),
+                      );
                       return ratesAsync.when(
-                        loading: () => const Center(child: CircularProgressIndicator()),
+                        loading: () =>
+                            const Center(child: CircularProgressIndicator(color: Color(0xFF388E3C))),
                         error: (err, _) => Center(child: Text('Error: $err')),
                         data: (items) => items.isEmpty
                             ? const Center(child: Text('No rates found'))
                             : ListView.builder(
-                                padding: EdgeInsets.all(Responsive.getResponsivePadding(context)),
+                                padding: EdgeInsets.all(
+                                  Responsive.getResponsivePadding(context),
+                                ),
                                 itemCount: items.length,
                                 itemBuilder: (ctx, i) {
                                   final rate = items[i];
@@ -143,18 +162,21 @@ class _RateListScreenState extends ConsumerState<RateListScreen> {
                                       vertical: isVerySmall ? 4 : 8,
                                     ),
                                     child: ListTile(
-                                     contentPadding: EdgeInsets.all(isVerySmall ? 6 : 8),
+                                      contentPadding: EdgeInsets.all(
+                                        isVerySmall ? 6 : 8,
+                                      ),
                                       title: Text(
                                         '${rate.cropName} - ${rate.packagingTypeName}',
                                         style: TextStyle(
                                           fontSize: titleSize,
-                                          fontWeight: FontWeight.w600,
                                         ),
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                       subtitle: Text(
                                         'Price: ₹${rate.amount} | Qty: ${rate.quantity} ${rate.unitName}',
-                                        style: TextStyle(fontSize: subtitleSize),
+                                        style: TextStyle(
+                                          fontSize: subtitleSize,
+                                        ),
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                       trailing: Wrap(
@@ -162,23 +184,30 @@ class _RateListScreenState extends ConsumerState<RateListScreen> {
                                         runSpacing: 4,
                                         children: [
                                           IconButton(
-                                            icon: Icon(Icons.remove_red_eye, size: iconSize),
+                                            icon: Icon(
+                                              Icons.remove_red_eye,
+                                              size: iconSize,
+                                            ),
                                             color: Colors.blue[700],
                                             onPressed: () => _viewDetails(rate),
                                             padding: EdgeInsets.zero,
                                             constraints: const BoxConstraints(),
                                           ),
                                           IconButton(
-                                            icon: Icon(Icons.edit, size: iconSize),
+                                            icon: Icon(
+                                              Icons.edit,
+                                              size: iconSize,
+                                            ),
                                             color: Colors.green[700],
                                             onPressed: () {
                                               Navigator.push(
                                                 context,
                                                 MaterialPageRoute(
-                                                  builder: (_) => AddEditRateScreen(
-                                                    hubCode: selectedHub!,
-                                                    rate: rate,
-                                                  ),
+                                                  builder: (_) =>
+                                                      AddEditRateScreen(
+                                                        hubCode: selectedHub!,
+                                                        rate: rate,
+                                                      ),
                                                 ),
                                               );
                                             },

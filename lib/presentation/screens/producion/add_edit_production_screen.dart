@@ -72,7 +72,7 @@ class _AddEditProductionScreenState
           padding: EdgeInsets.all(padding),
           children: [
             masterDataAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
+              loading: () => const Center(child: CircularProgressIndicator(color: Color(0xFF388E3C))),
               error: (err, _) => Center(child: Text('Error: $err', style: TextStyle(fontSize: fontSize))),
               data: (masterData) {
                 if (isEditing && _selectedCropCode != null && _selectedCropCategoryCode == null) {

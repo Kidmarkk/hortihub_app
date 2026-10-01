@@ -54,6 +54,7 @@ class UserModel extends Equatable {
                 'value': e['value'] ?? '',
                 'value1': e['value1']?.toString() ?? '',
                 'districtName': e['districtName'] ?? '',
+                'imageBase64': e['value2'] ?? '',
               },
             )
             .toList() ??
@@ -68,9 +69,9 @@ class UserModel extends Equatable {
       mobileNo: userDetails['mobileNo'],
       userCode: userDetails['userCode'],
       hubCode: userDetails['hubCode']?.toString(),
-      hubName: userDetails['hubName'],
+      hubName: userDetails['hubname'],
       districtCode: userDetails['districtCode']?.toString(),
-      districtName: userDetails['districtName'],
+      districtName: userDetails['districtname'],
       listDistricts: listDistricts,
       listHubs: listHubs,
     );

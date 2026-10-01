@@ -1,3 +1,5 @@
+import 'package:dio/dio.dart';
+
 import '../../core/constants/api_constants.dart';
 import '../datasources/remote/api_service.dart';
 import '../models/stock_models.dart';
@@ -12,19 +14,49 @@ class StockRepository {
     );
     print('📦 Stock full response: ${response.data}');
 
-    // Print each stockCode separately to avoid truncation
     final list = response.data['listDetails'] as List?;
-    if (list != null) {
-      print('📦 Number of stocks: ${list.length}');
-      for (var item in list) {
-        print('📦 stockCode: ${item['stockCode']}');
-      }
-    } else {
-      print('⚠️ listDetails is null');
+    if (list == null || list.isEmpty) {
+      print('⚠️ No stock rows found');
       return [];
     }
 
+    print('📦 Stock rows: ${list.length}');
     return list.map((json) => StockItem.fromJson(json)).toList();
+  }
+
+  Future<String> updateAvailability({
+    required String hubCode,
+    required String userCode,
+    String? districtCode,
+    required List<String> isAvailableArray,
+    required List<String> isNotAvailableArray,
+  }) async {
+    final payload = <String, dynamic>{
+      'hubCode': hubCode,
+      'userCode': userCode,
+      'isAvailableArray': isAvailableArray,
+      'isNotAvailableArray': isNotAvailableArray,
+    };
+    if (districtCode != null && districtCode.isNotEmpty) {
+      payload['districtCode'] = districtCode;
+    }
+
+    print('🟢 UPDATE AVAILABILITY PAYLOAD: $payload');
+
+    final response = await _api.postMultipartFormData(
+      ApiConstants.stockUpdateAvailability,
+      payload,
+    );
+
+    print('🟢 UPDATE AVAILABILITY STATUS: ${response.statusCode}');
+    print('🟢 UPDATE AVAILABILITY RESPONSE: ${response.data}');
+
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      throw Exception('Update failed: ${response.data}');
+    }
+
+    final message = response.data?.toString() ?? 'Details Saved!';
+    return message;
   }
 
   // Add new stock item

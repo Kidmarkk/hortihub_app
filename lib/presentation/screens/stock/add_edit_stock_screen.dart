@@ -27,6 +27,7 @@ class _AddEditStockScreenState extends ConsumerState<AddEditStockScreen> {
   String? _selectedUnitCode;
   String? _isAvailable;
   int? _quantityAvailable;
+  int? _quantityDamaged;
 
   @override
   void initState() {
@@ -40,7 +41,9 @@ class _AddEditStockScreenState extends ConsumerState<AddEditStockScreen> {
           ?.toString();
       _selectedUnitCode = widget.stockItem!.unitCode?.toString();
       _quantityAvailable = widget.stockItem!.quantityAvailable ?? 0;
-      _isAvailable = widget.stockItem!.isAvailable == 'Yes' ? 'Y' : 'N';
+      _quantityDamaged = widget.stockItem!.quantityDamaged ?? 0;
+      _isAvailable = (widget.stockItem!.isAvailable == 'Yes' ||
+                widget.stockItem!.isAvailable == 'Y') ? 'Y' : 'N';
     } else {
       _isAvailable = 'N';
     }
@@ -58,13 +61,6 @@ class _AddEditStockScreenState extends ConsumerState<AddEditStockScreen> {
         )
         .toList();
 
-    print(
-      '🔍 Filtered packaging types for crop $_selectedCropCode: ${filtered.map((p) => '${p.code}:${p.name}').toList()}',
-    );
-    print(
-      '🔍 cropPackagingMap for $_selectedCropCode: ${masterData.cropPackagingMap[_selectedCropCode]}',
-    );
-
     // If editing and current value is not in filtered list, add it
     final isEditing = widget.stockItem != null;
     if (isEditing && _selectedPackagingTypeCode != null) {
@@ -80,10 +76,29 @@ class _AddEditStockScreenState extends ConsumerState<AddEditStockScreen> {
     }
 
     return filtered.map((p) {
+      // ✅ Find the rate for this packaging + crop
+      RateInfo? rate;
+      for (final r in masterData.rates) {
+        if (r.cropCode == _selectedCropCode && r.packagingTypeCode == p.code) {
+          rate = r;
+          break;
+        }
+      }
+
+      // Build display name
+      String displayName = p.name;
+      if (rate?.quantity != null &&
+          rate!.quantity!.isNotEmpty &&
+          rate.unitName != null &&
+          rate.unitName!.isNotEmpty) {
+        final qty = double.tryParse(rate.quantity!) ?? 0.0;
+        displayName = '${p.name} (${qty.toStringAsFixed(2)} ${rate.unitName})';
+      }
+
       return DropdownMenuItem(
         value: p.code,
         child: Text(
-          p.name,
+          displayName,
           style: TextStyle(
             fontSize: Responsive.getResponsiveFontSize(context, baseSize: 14),
           ),
@@ -172,7 +187,7 @@ class _AddEditStockScreenState extends ConsumerState<AddEditStockScreen> {
               ),
             ),
             masterDataAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
+              loading: () => const Center(child: CircularProgressIndicator(color: Color(0xFF388E3C))),
               error: (err, _) => Center(
                 child: Text(
                   'Error: $err',
@@ -347,48 +362,77 @@ class _AddEditStockScreenState extends ConsumerState<AddEditStockScreen> {
                     SizedBox(height: spacing),
 
                     // Quantity (only if Yes)
+                    // Quantity (only if Yes)
                     if (_isAvailable == 'Y')
-                      // Quantity (only if Yes)
-                      if (_isAvailable == 'Y')
-                        Column(
-                          children: [
-                            TextFormField(
-                              initialValue:
-                                  _quantityAvailable?.toString() ?? '',
-                              style: TextStyle(fontSize: fontSize),
-                              decoration: InputDecoration(
-                                labelText: 'Quantity Available',
-                                labelStyle: TextStyle(fontSize: fontSize),
-                                border: const OutlineInputBorder(),
-                                contentPadding: EdgeInsets.symmetric(
-                                  vertical: isVerySmall ? 8 : 14,
-                                  horizontal: 12,
-                                ),
+                      Column(
+                        children: [
+                          // Quantity Available
+                          TextFormField(
+                            initialValue: _quantityAvailable?.toString() ?? '',
+                            style: TextStyle(fontSize: fontSize),
+                            decoration: InputDecoration(
+                              labelText: 'Quantity Available',
+                              labelStyle: TextStyle(fontSize: fontSize),
+                              border: const OutlineInputBorder(),
+                              contentPadding: EdgeInsets.symmetric(
+                                vertical: isVerySmall ? 8 : 14,
+                                horizontal: 12,
                               ),
-                              keyboardType: TextInputType.number,
-                              inputFormatters: [
-                                FilteringTextInputFormatter.digitsOnly,
-                              ], // only allow digits
-                              onChanged: (val) {
-                                // Only update if it's a valid integer
-                                final parsed = int.tryParse(val);
-                                if (parsed != null) {
-                                  _quantityAvailable = parsed;
-                                } else {
-                                  // If invalid, keep previous value (or set to null)
-                                  // We'll rely on the validator to prevent submission.
-                                }
-                              },
-                              validator: (v) {
-                                if (v == null || v.isEmpty) return 'Required';
-                                if (int.tryParse(v) == null)
-                                  return 'Enter a whole number (e.g., 5)';
-                                return null;
-                              },
                             ),
-                            SizedBox(height: spacing),
-                          ],
-                        ),
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                            ],
+                            onChanged: (val) {
+                              final parsed = int.tryParse(val);
+                              if (parsed != null) _quantityAvailable = parsed;
+                            },
+                            validator: (v) {
+                              if (v == null || v.isEmpty) return 'Required';
+                              if (int.tryParse(v) == null)
+                                return 'Enter a whole number (e.g., 5)';
+                              return null;
+                            },
+                          ),
+                          SizedBox(height: spacing),
+
+                            Column(
+                              children: [
+                                TextFormField(
+                                  initialValue:
+                                      _quantityDamaged?.toString() ?? '0',
+                                  style: TextStyle(fontSize: fontSize),
+                                  decoration: InputDecoration(
+                                    labelText: 'Quantity Damaged',
+                                    labelStyle: TextStyle(fontSize: fontSize),
+                                    border: const OutlineInputBorder(),
+                                    contentPadding: EdgeInsets.symmetric(
+                                      vertical: isVerySmall ? 8 : 14,
+                                      horizontal: 12,
+                                    ),
+                                  ),
+                                  keyboardType: TextInputType.number,
+                                  inputFormatters: [
+                                    FilteringTextInputFormatter.digitsOnly,
+                                  ],
+                                  onChanged: (val) {
+                                    final parsed = int.tryParse(val);
+                                    if (parsed != null)
+                                      _quantityDamaged = parsed;
+                                  },
+                                  validator: (v) {
+                                    if (v == null || v.isEmpty)
+                                      return null; // Optional
+                                    if (int.tryParse(v) == null)
+                                      return 'Enter a whole number';
+                                    return null;
+                                  },
+                                ),
+                                SizedBox(height: spacing),
+                              ],
+                            ),
+                        ],
+                      ),
 
                     // Unit (only if crop selected and available Yes)
                     if (_selectedCropCode != null && _isAvailable == 'Y')
@@ -440,7 +484,7 @@ class _AddEditStockScreenState extends ConsumerState<AddEditStockScreen> {
                 final packagingTypeCode =
                     int.tryParse(_selectedPackagingTypeCode!) ?? 0;
                 final quantityAvailable = _quantityAvailable ?? 0;
-                final isAvailable = _isAvailable == 'Y' ? 'Yes' : 'No';
+                final isAvailable = _isAvailable == 'Y' ? 'Y' : 'N';
 
                 // Unit code optional
                 int? unitCode;
@@ -459,12 +503,15 @@ class _AddEditStockScreenState extends ConsumerState<AddEditStockScreen> {
                     'isAvailable': isAvailable,
                     'userCode': user.userCode.toString(),
                     'stockCode': widget.stockItem!.stockCode.toString(),
+                    'quantityDamaged': (_quantityDamaged ?? 0).toString(),
                   };
                   if (unitCode != null) {
                     payload['unitCode'] = unitCode.toString();
                   }
                   await notifier.updateStock(payload, user.token);
-                  ref.refresh(stockListProvider(widget.hubCode));
+                  final _ = await ref.refresh(
+                    stockListProvider(widget.hubCode).future,
+                  );
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
@@ -480,6 +527,7 @@ class _AddEditStockScreenState extends ConsumerState<AddEditStockScreen> {
                     'cropCode': cropCode.toString(),
                     'packagingTypeCode': packagingTypeCode.toString(),
                     'quantityAvailable': quantityAvailable.toString(),
+                    'quantityDamaged': (_quantityDamaged ?? 0).toString(), 
                     'isAvailable': isAvailable,
                     'userCode': user.userCode.toString(),
                   };
@@ -494,8 +542,7 @@ class _AddEditStockScreenState extends ConsumerState<AddEditStockScreen> {
                   );
 
                   // Check if stock appears in the list (rate exists)
-                  ref.refresh(stockListProvider(widget.hubCode));
-                  final freshList = await ref.read(
+                  final freshList = await ref.refresh(
                     stockListProvider(widget.hubCode).future,
                   );
 

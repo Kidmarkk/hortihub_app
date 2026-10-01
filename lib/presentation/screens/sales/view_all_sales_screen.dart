@@ -74,6 +74,9 @@ class _ViewAllSalesScreenState extends ConsumerState<ViewAllSalesScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.red,
+            ),
             child: const Text('Close'),
           ),
         ],
@@ -97,7 +100,7 @@ class _ViewAllSalesScreenState extends ConsumerState<ViewAllSalesScreen> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         ref.read(selectedHubProvider.notifier).state = user?.hubCode;
       });
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(body: Center(child: CircularProgressIndicator(color: Color(0xFF388E3C))));
     }
 
     return Scaffold(
@@ -145,7 +148,7 @@ class _ViewAllSalesScreenState extends ConsumerState<ViewAllSalesScreen> {
                       );
                       return salesAsync.when(
                         loading: () =>
-                            const Center(child: CircularProgressIndicator()),
+                            const Center(child: CircularProgressIndicator(color: Color(0xFF388E3C))),
                         error: (err, _) => Center(child: Text('Error: $err')),
                         data: (sales) => sales.isEmpty
                             ? Center(
@@ -193,7 +196,7 @@ class _ViewAllSalesScreenState extends ConsumerState<ViewAllSalesScreen> {
                                           IconButton(
                                             icon: const Icon(
                                               Icons.print,
-                                              color: Colors.blue,
+                                              color: Colors.green,
                                             ),
                                             tooltip: 'Print Receipt',
                                             onPressed: () {
@@ -201,7 +204,9 @@ class _ViewAllSalesScreenState extends ConsumerState<ViewAllSalesScreen> {
                                                 context: context,
                                                 ref: ref,
                                                 sale: sale,
-                                                hubCode: widget.hubCode ?? '', // or your selected hub code variable
+                                                hubCode:
+                                                    widget.hubCode ??
+                                                    '', // or your selected hub code variable
                                               );
                                             },
                                           ),

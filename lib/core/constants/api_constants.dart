@@ -19,6 +19,7 @@ class ApiConstants {
   static const String stockList = '/private/stock/listDetails/';
   static const String stockAdd = '/private/stock/addDetails';
   static const String stockUpdate = '/private/stock/updateDetails';
+  static const String stockUpdateAvailability = '/private/stock/updateAvailability';
 
   // Rates
   static const String ratesList = '/private/rates/listDetails/';
